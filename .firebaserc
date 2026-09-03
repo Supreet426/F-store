@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "fryumm-5c865"
+  },
+  "targets": {
+    "fryumm-5c865": {
+      "hosting": {
+        "app": [
+          "flasho"
+        ],
+        "main": [
+          "fryumm-5c865"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

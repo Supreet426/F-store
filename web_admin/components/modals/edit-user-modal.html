@@ -1,0 +1,86 @@
+<div id="modal-edit-user" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <div>
+                <h3 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-user-pen text-brand-400"></i> Edit User Profile & Governance</h3>
+                <p class="text-[11px] text-slate-400">Update account credentials, roles, verification status, and freeze controls</p>
+            </div>
+            <button onclick="closeEditUserModal()" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm cursor-pointer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-edit-user" class="space-y-3">
+            <input type="hidden" id="edit-user-uid">
+            <input type="hidden" id="edit-user-col">
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="edit-user-name">Full Name</label>
+                    <input type="text" id="edit-user-name" required class="input-field" placeholder="John Doe">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="edit-user-phone">Mobile Number</label>
+                    <input type="tel" id="edit-user-phone" required class="input-field" placeholder="9876543210">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="edit-user-email">Email Address</label>
+                <input type="email" id="edit-user-email" required class="input-field" placeholder="user@flash-o.com">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="edit-user-role">Account Role</label>
+                    <select id="edit-user-role" onchange="document.getElementById('edit-dept-wrap').style.display = this.value === 'OTHER' ? 'block' : 'none'" class="input-field">
+                        <option value="MERCHANT">Merchant / Store Owner</option>
+                        <option value="RIDER">Delivery Partner (Rider)</option>
+                        <option value="CUSTOMER">Customer</option>
+                        <option value="OTHER">Staff / Tech Worker</option>
+                        <option value="ADMIN" disabled>Platform Admin (Whitelisted Only)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="edit-user-approved">Merchant Approval</label>
+                    <select id="edit-user-approved" class="input-field font-semibold">
+                        <option value="true">Verified & Approved</option>
+                        <option value="false">Pending Verification</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="edit-dept-wrap" style="display:none;">
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="edit-user-dept">Staff Department</label>
+                <select id="edit-user-dept" class="input-field">
+                    <option value="Helpline & Customer Support">Helpline & Customer Support</option>
+                    <option value="Cancellation Management">Cancellation Management</option>
+                    <option value="Website Management">Website Management</option>
+                    <option value="Advertisement & Marketing">Advertisement & Marketing</option>
+                    <option value="Technical Operations">Technical Operations</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="edit-user-active">Account Status</label>
+                    <select id="edit-user-active" onchange="document.getElementById('edit-reason-wrap').style.display = this.value === 'false' ? 'block' : 'none'" class="input-field font-semibold">
+                        <option value="true">Active Account</option>
+                        <option value="false">Frozen / Suspended</option>
+                    </select>
+                </div>
+                <div id="edit-reason-wrap" style="display:none;" class="col-span-2">
+                    <label class="block text-xs font-semibold text-rose-400 mb-1" for="edit-user-reason">Freeze / Suspension Reason</label>
+                    <textarea id="edit-user-reason" rows="2" class="input-field text-xs" placeholder="Reason for suspending account..."></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeEditUserModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white cursor-pointer">Cancel</button>
+                <button type="submit" class="btn-primary text-xs px-5 py-2 flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Profile Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

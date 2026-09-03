@@ -1,0 +1,11 @@
+{
+  "backup_name": "Level 1 - Stable Web Admin & Firebase Integration",
+  "timestamp": "2026-09-01T09:56:36.052491400+05:30",
+  "firebase_project": "fryumm-5c865",
+  "hosting_url": "https://fryumm-5c865.web.app",
+  "backed_up_directories": [
+    "C:/Users/supre/AndroidStudioProjects/Flash-O/F-Store/web_admin_level_1",
+    "C:/Users/supre/AndroidStudioProjects/Flash-O/web-portal_level_1"
+  ],
+  "status": "STABLE_AND_LIVE"
+}

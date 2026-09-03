@@ -1,0 +1,30 @@
+<div id="modal-reassign-rider" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <h3 class="text-base font-bold text-sky-400 flex items-center gap-2">
+                <i class="fa-solid fa-motorcycle"></i> Reassign Delivery Rider
+            </h3>
+            <button type="button" onclick="closeReassignRiderModal()" class="text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form id="form-reassign-rider" onsubmit="submitReassignRider(event)" class="space-y-4">
+            <input type="hidden" id="reassign-order-id">
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="reassign-rider-select">Select Active Delivery Partner</label>
+                <select id="reassign-rider-select" required class="input-field bg-slate-950 border-slate-800 focus:border-sky-500">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeReassignRiderModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                <button type="submit" class="btn-primary text-xs px-5 py-2 flex items-center gap-2">
+                    <i class="fa-solid fa-check"></i> Assign Rider
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

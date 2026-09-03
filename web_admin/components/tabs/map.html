@@ -1,0 +1,13 @@
+<div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 flex justify-between items-center">
+    <div>
+        <h3 class="font-bold text-lg text-white">Realtime Operations Live Map</h3>
+        <p class="text-xs text-slate-400">Live position tracking of Dark Store Hubs and Delivery Partners</p>
+    </div>
+    <button onclick="initLiveMap()" class="btn-primary text-xs px-4 py-2 flex items-center gap-2 cursor-pointer">
+        <i class="fa-solid fa-location-crosshairs"></i> Recenter Map
+    </button>
+</div>
+
+<div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-2">
+    <div id="live-map-container" class="w-full h-[550px] rounded-xl z-10"></div>
+</div>

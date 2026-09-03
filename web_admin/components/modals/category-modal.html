@@ -1,0 +1,17 @@
+<div id="modal-category" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-layer-group text-accent-500"></i> Category Manager
+        </h3>
+        <form id="form-add-category" class="flex gap-2">
+            <input type="text" id="category-name-input" required class="input-field text-xs" placeholder="New Category Name (e.g., Beverages)">
+            <button type="submit" class="btn-primary text-xs px-4 whitespace-nowrap">Add Category</button>
+        </form>
+        <div id="categories-list-container" class="max-h-60 overflow-y-auto space-y-2 border-t border-slate-800 pt-3">
+            <p class="text-xs text-slate-500 text-center">Loading categories...</p>
+        </div>
+        <div class="flex justify-end pt-2">
+            <button type="button" onclick="closeCategoryModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white">Close</button>
+        </div>
+    </div>
+</div>

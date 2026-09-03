@@ -1,0 +1,76 @@
+<!-- Modal: Merge Duplicate Account Conflict Resolution -->
+<div id="modal-merge-account" class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 hidden">
+    <div class="bg-slate-900 border border-amber-500/50 p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-4xl text-left relative overflow-hidden my-auto max-h-[95vh] overflow-y-auto space-y-6">
+
+        <!-- Header -->
+        <div class="flex justify-between items-start border-b border-slate-800 pb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 text-xl font-bold">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-extrabold text-white">Duplicate Account Conflict Detected</h3>
+                    <p id="merge-modal-subtitle" class="text-xs text-amber-300 font-medium">Multiple user accounts found matching Mobile Number, Email, or Device Signature</p>
+                </div>
+            </div>
+            <button onclick="closeMergeModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-slate-700">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Alert Banner -->
+        <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs leading-relaxed flex items-start gap-3">
+            <i class="fa-solid fa-shield-halved text-amber-400 text-base mt-0.5 shrink-0"></i>
+            <div>
+                <p class="font-bold">Security & Identity Policy Notice:</p>
+                <p class="mt-0.5 text-amber-300/90">System detected overlapping user data. To prevent multi-account abuse or fraud, review both accounts below. Accounts will <strong>NEVER</strong> be merged or deleted without explicit Admin confirmation.</p>
+            </div>
+        </div>
+
+        <!-- Side-by-Side Comparison -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- Account A (Primary) -->
+            <div class="bg-slate-950/80 border border-brand-500/50 rounded-2xl p-5 space-y-4 relative">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-xs font-bold text-brand-400 uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-crown text-amber-400"></i> Account A (Target Primary)</span>
+                    <span id="merge-acc-a-role" class="badge bg-slate-800 text-slate-300">MERCHANT</span>
+                </div>
+                <div class="space-y-2 text-xs">
+                    <p class="text-slate-400 font-semibold">Name: <span id="merge-acc-a-name" class="text-white font-bold text-sm">--</span></p>
+                    <p class="text-slate-400 font-semibold">Email: <span id="merge-acc-a-email" class="text-slate-200 font-mono">--</span></p>
+                    <p class="text-slate-400 font-semibold">Mobile: <span id="merge-acc-a-phone" class="text-slate-200 font-mono">--</span></p>
+                    <p class="text-slate-400 font-semibold">UID: <span id="merge-acc-a-uid" class="text-slate-400 font-mono text-[11px]">--</span></p>
+                    <p class="text-slate-400 font-semibold">Collection: <span id="merge-acc-a-col" class="text-slate-300 font-mono">--</span></p>
+                </div>
+            </div>
+
+            <!-- Account B (Duplicate to Merge) -->
+            <div class="bg-slate-950/80 border border-rose-500/40 rounded-2xl p-5 space-y-4 relative">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-copy"></i> Account B (Flagged Duplicate)</span>
+                    <span id="merge-acc-b-role" class="badge bg-slate-800 text-slate-300">CUSTOMER</span>
+                </div>
+                <div class="space-y-2 text-xs">
+                    <p class="text-slate-400 font-semibold">Name: <span id="merge-acc-b-name" class="text-white font-bold text-sm">--</span></p>
+                    <p class="text-slate-400 font-semibold">Email: <span id="merge-acc-b-email" class="text-slate-200 font-mono">--</span></p>
+                    <p class="text-slate-400 font-semibold">Mobile: <span id="merge-acc-b-phone" class="text-slate-200 font-mono">--</span></p>
+                    <p class="text-slate-400 font-semibold">UID: <span id="merge-acc-b-uid" class="text-slate-400 font-mono text-[11px]">--</span></p>
+                    <p class="text-slate-400 font-semibold">Collection: <span id="merge-acc-b-col" class="text-slate-300 font-mono">--</span></p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Action Footer -->
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-slate-800">
+            <button onclick="dismissConflictAlert()" class="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 cursor-pointer">
+                Keep Accounts Separate (Ignore Alert)
+            </button>
+            <button onclick="confirmAndExecuteMerge()" class="w-full sm:w-auto btn-primary text-xs px-6 py-2.5 flex items-center justify-center gap-2 cursor-pointer shadow-lg bg-gradient-to-r from-amber-600 to-brand-600">
+                <i class="fa-solid fa-object-group"></i> Approve & Merge Account B into Account A
+            </button>
+        </div>
+
+    </div>
+</div>

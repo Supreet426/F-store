@@ -1,0 +1,4 @@
+- `[ ]` Create seeding script `seed_firestore.js` in scratch directory
+- `[ ]` Provide terminal commands for Firebase Rules deployment
+- `[ ]` Provide terminal commands for running the seed script
+- `[ ]` Verify collection structure in StoreViewModel and Admin JS

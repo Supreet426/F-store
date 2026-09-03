@@ -1,0 +1,142 @@
+<!-- Banners & Ads -->
+<div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="font-bold text-lg text-white">1. Home Carousel Banners & Advertisements</h3>
+            <p class="text-xs text-slate-400">Control promotional banners and video advertisements shown in Customer App</p>
+        </div>
+        <button onclick="openBannerModal()" class="btn-primary text-xs px-4 py-2 flex items-center gap-2 cursor-pointer">
+            <i class="fa-solid fa-plus"></i> Add New Banner
+        </button>
+    </div>
+    <div id="banners-container" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+</div>
+
+<!-- Flash Sale Engine -->
+<div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="font-bold text-lg text-white">2. Flash Sale & Countdown Engine</h3>
+            <p class="text-xs text-slate-400">Configure time-limited sales, discounts, and featured flash items</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="toggle-flash-sale" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
+            <span class="ml-3 text-xs font-bold text-slate-300">Enable Flash Sale</span>
+        </label>
+    </div>
+    <form id="form-flash-sale" class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Flash Sale Title</label>
+            <input type="text" id="fs-title" class="input-field" placeholder="Flash Sale 50% Off">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Discount %</label>
+            <input type="number" id="fs-discount" class="input-field" placeholder="50">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Duration (Hours)</label>
+            <input type="number" id="fs-hours" class="input-field" placeholder="24">
+        </div>
+        <div class="md:col-span-3">
+            <button type="submit" class="btn-primary text-xs px-6 py-2.5 cursor-pointer">Save & Launch Flash Sale</button>
+        </div>
+    </form>
+</div>
+
+<!-- FCM Push Notification Broadcast -->
+<div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h3 class="font-bold text-lg text-white flex items-center gap-2">
+                <i class="fa-solid fa-paper-plane text-brand-400"></i> Push Notification Broadcaster
+            </h3>
+            <p class="text-xs text-slate-400">Compose and send real-time Firebase Cloud Messaging (FCM) notifications to app users</p>
+        </div>
+        <button onclick="openFcmModal()" class="btn-primary text-xs px-4 py-2 flex items-center gap-2 cursor-pointer">
+            <i class="fa-solid fa-paper-plane"></i> Broadcast Push
+        </button>
+    </div>
+    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+        <div>
+            <span class="text-slate-400">Last Broadcast Sent:</span>
+            <span id="last-fcm-sent-text" class="text-white font-mono ml-2">No broadcasts sent today</span>
+        </div>
+        <span class="badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">FCM Service Ready</span>
+    </div>
+</div>
+
+<!-- Flash-O Pass Membership Tiers -->
+<div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="font-bold text-lg text-white">3. Flash-O Pass Membership Tiers</h3>
+            <p class="text-xs text-slate-400">Configure VIP subscription tiers, prices, and free delivery thresholds</p>
+        </div>
+    </div>
+    <div id="pass-tiers-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+</div>
+
+<!-- Popup Broadcast Alert -->
+<div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+    <h3 class="font-bold text-lg text-white mb-1">4. Customer App Popup Alert Broadcast</h3>
+    <p class="text-xs text-slate-400 mb-6">Display a prominent pop-up announcement when customers open the app</p>
+
+    <form id="form-popup-notification" class="space-y-4 max-w-2xl bg-slate-950/60 p-5 rounded-xl border border-slate-800">
+        <div class="flex items-center gap-3 mb-2">
+            <input type="checkbox" id="popup-is-active" class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-brand-600 focus:ring-brand-500">
+            <label for="popup-is-active" class="text-sm font-semibold text-white">Active Popup Alert</label>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Popup Title</label>
+                <input type="text" id="popup-title" class="input-field" placeholder="🎉 Festive Special Offer!">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Image URL (Optional)</label>
+                <input type="url" id="popup-image" class="input-field" placeholder="https://...">
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Popup Message</label>
+            <textarea id="popup-message" rows="2" class="input-field" placeholder="Get 50% Cashback on your first 3 orders this week!"></textarea>
+        </div>
+        <button type="submit" class="btn-primary text-xs px-6 py-2.5 cursor-pointer">Update Customer App Popup</button>
+    </form>
+</div>
+
+<!-- Forced App Update -->
+<div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+    <h3 class="font-bold text-lg text-white mb-1">5. Forced App Update Controller</h3>
+    <p class="text-xs text-slate-400 mb-6">Manage version codes and compel users to update Customer/Partner apps</p>
+
+    <form id="form-app-update" class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl bg-slate-950/60 p-5 rounded-xl border border-slate-800">
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Target App</label>
+            <select id="update-target-app" class="input-field">
+                <option value="customer">Customer App (com.fryumm)</option>
+                <option value="partner">Partner/Delivery App</option>
+                <option value="store">F-Store App</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Version Code</label>
+            <input type="number" id="update-version-code" class="input-field" placeholder="2">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Version Name</label>
+            <input type="text" id="update-version-name" class="input-field" placeholder="1.1.0">
+        </div>
+        <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-400 mb-1">APK / Play Store Download URL</label>
+            <input type="url" id="update-download-url" class="input-field" placeholder="https://play.google.com/store/apps/details?id=com.flash-o.customer">
+        </div>
+        <div class="flex items-center gap-3">
+            <input type="checkbox" id="update-is-mandatory" class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-brand-600">
+            <label for="update-is-mandatory" class="text-xs font-semibold text-rose-400">Force Update (Mandatory)</label>
+        </div>
+        <div class="md:col-span-3">
+            <button type="submit" class="btn-primary text-xs px-6 py-2.5 cursor-pointer">Publish App Update Rule</button>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,47 @@
+<div id="modal-coupon" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+        <h3 class="text-lg font-bold text-white">Create Promo Coupon</h3>
+        <form id="form-coupon" class="space-y-3">
+            <input type="hidden" id="coupon-id">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="coupon-code">Coupon Code</label>
+                    <input type="text" id="coupon-code" required class="input-field font-mono uppercase" placeholder="WELCOME50">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="coupon-type">Discount Type</label>
+                    <select id="coupon-type" class="input-field">
+                        <option value="PERCENTAGE">Percentage (%)</option>
+                        <option value="FLAT">Flat Amount (₹)</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="coupon-title">Title / Description</label>
+                <input type="text" id="coupon-title" required class="input-field" placeholder="50% Off on First Order">
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="coupon-value">Value</label>
+                    <input type="number" id="coupon-value" required class="input-field" placeholder="50">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="coupon-min-order">Min Order (₹)</label>
+                    <input type="number" id="coupon-min-order" class="input-field" placeholder="199">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="coupon-max-discount">Max Disc (₹)</label>
+                    <input type="number" id="coupon-max-discount" class="input-field" placeholder="100">
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="coupon-active" checked class="w-4 h-4 rounded">
+                <label for="coupon-active" class="text-xs font-semibold text-white">Active Coupon</label>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button" onclick="closeCouponModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                <button type="submit" class="btn-primary text-xs px-5 py-2">Save Coupon</button>
+            </div>
+        </form>
+    </div>
+</div>

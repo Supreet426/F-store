@@ -1,0 +1,429 @@
+<!-- ANALYTICS & INSIGHTS CONTROL CENTER -->
+<div class="space-y-6">
+
+    <!-- TOP FILTER & CONTROL BAR -->
+    <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xl">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white shadow-md shrink-0">
+                <i class="fa-solid fa-chart-line text-lg"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-lg text-white flex items-center gap-2">
+                    Executive Analytics & Operations Intelligence
+                    <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">Enterprise</span>
+                </h3>
+                <p class="text-xs text-slate-400">Real-time metrics integrated across Quick-Commerce, E-Commerce, and GA4 Analytics</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Timeframe Filter -->
+            <select id="analytics-timeframe" onchange="window.updateAnalyticsFilters()" class="bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
+                <option value="today">Today (Live)</option>
+                <option value="7d" selected>Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="ytd">Year to Date (YTD)</option>
+            </select>
+
+            <!-- Dark Store Filter -->
+            <select id="analytics-hub-filter" onchange="window.updateAnalyticsFilters()" class="bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
+                <option value="all">All Dark Stores</option>
+                <option value="indiranagar">Indiranagar Hub (DS-101)</option>
+                <option value="koramangala">Koramangala Hub (DS-102)</option>
+                <option value="hsr">HSR Layout Hub (DS-103)</option>
+                <option value="whitefield">Whitefield Hub (DS-104)</option>
+            </select>
+
+            <!-- Category Filter -->
+            <select id="analytics-category-filter" onchange="window.updateAnalyticsFilters()" class="bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
+                <option value="all">All Categories</option>
+                <option value="snacks">Snacks & Chaat</option>
+                <option value="dairy">Dairy & Eggs</option>
+                <option value="beverages">Beverages</option>
+                <option value="bakery">Bakery & Breads</option>
+                <option value="fresh">Fresh Fruits & Vegetables</option>
+            </select>
+
+            <!-- Refresh / Export -->
+            <button onclick="window.refreshAnalyticsData()" title="Reload Data" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-2 rounded-xl transition border border-slate-700 flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-arrows-rotate text-brand-400"></i>
+                <span class="hidden sm:inline">Sync</span>
+            </button>
+            <button onclick="window.exportAnalyticsReport()" title="Export CSV Report" class="bg-brand-600 hover:bg-brand-500 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition shadow-md flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-download"></i>
+                <span>Export Report</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- HIGH-LEVEL EXECUTIVE KPIS GRID -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <!-- Card 1: GMV -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-400">Gross Sales (GMV)</span>
+                <div class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-indian-rupee-sign"></i>
+                </div>
+            </div>
+            <div>
+                <p id="kpi-gmv" class="text-xl font-extrabold text-white">₹0</p>
+                <p id="kpi-gmv-trend" class="text-[11px] font-medium text-emerald-400 mt-1 flex items-center gap-1">
+                    <i class="fa-solid fa-arrow-trend-up"></i> +18.4% vs prev.
+                </p>
+            </div>
+        </div>
+
+        <!-- Card 2: Total Orders -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-400">Total Orders</span>
+                <div class="w-7 h-7 rounded-lg bg-brand-500/10 text-brand-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-box-archive"></i>
+                </div>
+            </div>
+            <div>
+                <p id="kpi-total-orders" class="text-xl font-extrabold text-white">0</p>
+                <p id="kpi-sla-breaches" class="text-[11px] font-medium text-amber-400 mt-1 flex items-center gap-1">
+                    <i class="fa-solid fa-triangle-exclamation"></i> 1.2% SLA breach
+                </p>
+            </div>
+        </div>
+
+        <!-- Card 3: AOV -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-400">Avg Order Value</span>
+                <div class="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-basket-shopping"></i>
+                </div>
+            </div>
+            <div>
+                <p id="kpi-aov" class="text-xl font-extrabold text-white">₹0</p>
+                <p class="text-[11px] font-medium text-slate-400 mt-1">Target: ₹350+</p>
+            </div>
+        </div>
+
+        <!-- Card 4: Delivery SLA -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-400">Avg Delivery SLA</span>
+                <div class="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+            </div>
+            <div>
+                <p id="kpi-avg-sla" class="text-xl font-extrabold text-sky-400">11.2 min</p>
+                <p class="text-[11px] font-medium text-emerald-400 mt-1">96.8% On-Time</p>
+            </div>
+        </div>
+
+        <!-- Card 5: Rider Utilization -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-400">Rider Fleet Active</span>
+                <div class="w-7 h-7 rounded-lg bg-violet-500/10 text-violet-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </div>
+            </div>
+            <div>
+                <p id="kpi-rider-util" class="text-xl font-extrabold text-white">88.5%</p>
+                <p class="text-[11px] font-medium text-slate-400 mt-1">42 / 48 On Duty</p>
+            </div>
+        </div>
+
+        <!-- Card 6: Stockout Impact -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-400">Lost OOS Revenue</span>
+                <div class="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+            </div>
+            <div>
+                <p id="kpi-oos-loss" class="text-xl font-extrabold text-rose-400">₹14,280</p>
+                <p class="text-[11px] font-medium text-slate-400 mt-1">32 SKU Stockouts</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- QUICK-COMMERCE FULFILLMENT CYCLE TIME BREAKDOWN (Zepto/Blinkit Benchmarks) -->
+    <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+                <h4 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-stopwatch text-brand-400"></i>
+                    Dark Store Order Cycle Time Breakdown (10-Min Delivery Benchmark)
+                </h4>
+                <p class="text-xs text-slate-400">Real-time breakdown of internal store picking, packing, and last-mile dispatch stages</p>
+            </div>
+            <span class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-full font-semibold border border-slate-700">Target Cycle: &lt; 12.0 mins</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Stage 1: Item Pick Time -->
+            <div class="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span class="text-xs font-semibold text-slate-300">1. Picker Item Pick Time</span>
+                    <span class="text-xs font-bold text-emerald-400">2.1 min</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-2">
+                    <div class="bg-emerald-500 h-full rounded-full" style="width: 70%"></div>
+                </div>
+                <p class="text-[11px] text-slate-400">SLA Target: &lt; 2.5 min <span class="text-emerald-400 font-semibold">(Passing)</span></p>
+            </div>
+
+            <!-- Stage 2: Bag Packing -->
+            <div class="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span class="text-xs font-semibold text-slate-300">2. QC & Bag Packing</span>
+                    <span class="text-xs font-bold text-emerald-400">1.2 min</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-2">
+                    <div class="bg-emerald-500 h-full rounded-full" style="width: 60%"></div>
+                </div>
+                <p class="text-[11px] text-slate-400">SLA Target: &lt; 1.5 min <span class="text-emerald-400 font-semibold">(Passing)</span></p>
+            </div>
+
+            <!-- Stage 3: Rider Handover -->
+            <div class="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span class="text-xs font-semibold text-slate-300">3. Rider Dispatch Handover</span>
+                    <span class="text-xs font-bold text-amber-400">0.9 min</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-2">
+                    <div class="bg-amber-500 h-full rounded-full" style="width: 85%"></div>
+                </div>
+                <p class="text-[11px] text-slate-400">SLA Target: &lt; 1.0 min <span class="text-amber-400 font-semibold">(Warning)</span></p>
+            </div>
+
+            <!-- Stage 4: Last-Mile Delivery -->
+            <div class="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span class="text-xs font-semibold text-slate-300">4. Last-Mile Transit Time</span>
+                    <span class="text-xs font-bold text-emerald-400">7.0 min</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-2">
+                    <div class="bg-sky-500 h-full rounded-full" style="width: 75%"></div>
+                </div>
+                <p class="text-[11px] text-slate-400">Avg Distance: 2.1 km | Speed: 18 km/h</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS ROW 1: SALES TREND & HOURLY ORDER SPIKES -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Sales & GMV Trend -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-white">Sales & Revenue Trend</h3>
+                    <p class="text-xs text-slate-400">Daily GMV (₹) and Order Volume comparison</p>
+                </div>
+                <span class="text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 font-semibold">
+                    +18.4% YoY
+                </span>
+            </div>
+            <div class="h-72">
+                <canvas id="chart-sales-trend"></canvas>
+            </div>
+        </div>
+
+        <!-- Hourly Peak Order Spikes Heatmap -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-white">Hourly Order Demand Spikes</h3>
+                    <p class="text-xs text-slate-400">Order traffic distribution across 24 hours (7 AM - 11 PM Peak Analysis)</p>
+                </div>
+                <span class="text-xs text-brand-400 bg-brand-500/10 px-2.5 py-1 rounded-lg border border-brand-500/20 font-semibold">
+                    Peak: 19:00 - 21:00
+                </span>
+            </div>
+            <div class="h-72">
+                <canvas id="chart-hourly-spikes"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS ROW 2: CATEGORY BREAKDOWN & E-COMMERCE CONVERSION FUNNEL -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Category Breakdown & Out of Stock -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-white">Category Sales Share</h3>
+                    <p class="text-xs text-slate-400">Revenue split across catalog categories</p>
+                </div>
+            </div>
+            <div class="h-64 flex justify-center items-center">
+                <canvas id="chart-category-breakdown"></canvas>
+            </div>
+        </div>
+
+        <!-- GA4 E-Commerce Conversion Funnel -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-white">GA4 Purchase Conversion Funnel</h3>
+                    <p class="text-xs text-slate-400">User session progression from App Open to Successful Order</p>
+                </div>
+                <span class="text-xs text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20 font-semibold">
+                    Overall Conv: 6.8%
+                </span>
+            </div>
+            <div class="h-64">
+                <canvas id="chart-conversion-funnel"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS ROW 3: PAYMENT METHODS & USER RETENTION COHORTS -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Payment Method Distribution -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+            <h3 class="font-bold text-lg text-white mb-1">Payment Mix Breakdown</h3>
+            <p class="text-xs text-slate-400 mb-4">UPI vs Cards vs Wallet vs Cash on Delivery</p>
+            <div class="h-56 flex justify-center items-center">
+                <canvas id="chart-payment-methods"></canvas>
+            </div>
+        </div>
+
+        <!-- Customer Retention & DAU/MAU Stickiness -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl col-span-1 lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-white">Customer Engagement & Cohort Retention</h3>
+                    <p class="text-xs text-slate-400">DAU/MAU ratios, 30-day repeat purchase rate, and LTV metrics</p>
+                </div>
+                <span class="text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2.5 py-1 rounded-lg font-semibold">
+                    30-Day Repeat: 74.2%
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div class="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
+                    <p class="text-xs text-slate-400 font-semibold">DAU / MAU Ratio (Stickiness)</p>
+                    <p class="text-2xl font-extrabold text-white mt-1">38.4%</p>
+                    <p class="text-[11px] text-emerald-400 mt-1"><i class="fa-solid fa-circle-check"></i> High Daily Habit</p>
+                </div>
+                <div class="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
+                    <p class="text-xs text-slate-400 font-semibold">Avg Customer LTV</p>
+                    <p class="text-2xl font-extrabold text-emerald-400 mt-1">₹4,850</p>
+                    <p class="text-[11px] text-slate-400 mt-1">CAC: ₹180 | LTV:CAC = 26.9x</p>
+                </div>
+                <div class="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
+                    <p class="text-xs text-slate-400 font-semibold">User Churn Rate (30D)</p>
+                    <p class="text-2xl font-extrabold text-amber-400 mt-1">4.2%</p>
+                    <p class="text-[11px] text-slate-400 mt-1">Re-engagement campaigns active</p>
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
+                <div class="flex justify-between items-center text-xs text-slate-300 font-semibold mb-2">
+                    <span>30-Day Repeat Order Cohort Progression</span>
+                    <span class="text-brand-400">Month 1 Target Met</span>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-center text-xs">
+                    <div class="p-2 bg-slate-900 rounded-lg border border-slate-800">
+                        <p class="text-[10px] text-slate-400">Week 1</p>
+                        <p class="font-bold text-white text-sm">88.2%</p>
+                    </div>
+                    <div class="p-2 bg-slate-900 rounded-lg border border-slate-800">
+                        <p class="text-[10px] text-slate-400">Week 2</p>
+                        <p class="font-bold text-white text-sm">79.5%</p>
+                    </div>
+                    <div class="p-2 bg-slate-900 rounded-lg border border-slate-800">
+                        <p class="text-[10px] text-slate-400">Week 3</p>
+                        <p class="font-bold text-white text-sm">74.8%</p>
+                    </div>
+                    <div class="p-2 bg-slate-900 rounded-lg border border-slate-800">
+                        <p class="text-[10px] text-slate-400">Week 4</p>
+                        <p class="font-bold text-brand-400 text-sm">74.2%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM ROW: SEARCH INTELLIGENCE & RISK/FRAUD METRICS -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Top Search Queries & Zero Result Opportunities -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-white">Search Intelligence & Demand Discovery</h3>
+                    <p class="text-xs text-slate-400">High-converting search queries vs zero-result missing items</p>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btn-search-top" onclick="window.switchSearchTab('top')" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-brand-600 text-white cursor-pointer">Top Search</button>
+                    <button id="btn-search-zero" onclick="window.switchSearchTab('zero')" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white cursor-pointer">Zero Results</button>
+                </div>
+            </div>
+            <div id="search-analytics-list" class="space-y-3">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </div>
+
+        <!-- Fraud, Risk & Security Controls -->
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+            <h3 class="font-bold text-lg text-white mb-1">Fraud & Risk Guardrails</h3>
+            <p class="text-xs text-slate-400 mb-4">Proactive abuse detection and order safety indicators</p>
+
+            <div class="space-y-3">
+                <div class="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                            <i class="fa-solid fa-rotate-right text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-white">Repeat Order Genuine Rate</p>
+                            <p class="text-[11px] text-slate-400">Legitimate recurring customer profile</p>
+                        </div>
+                    </div>
+                    <span class="text-lg font-extrabold text-emerald-400">98.8%</span>
+                </div>
+
+                <div class="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                            <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-white">Flagged Suspicious Cancellations</p>
+                            <p class="text-[11px] text-slate-400">Multiple cancellations on same device/IP</p>
+                        </div>
+                    </div>
+                    <span class="text-lg font-extrabold text-amber-400">1.8%</span>
+                </div>
+
+                <div class="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                            <i class="fa-solid fa-ticket text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-white">Coupon / Promo Stacking Abuse</p>
+                            <p class="text-[11px] text-slate-400">Attempts blocked by fraud rules</p>
+                        </div>
+                    </div>
+                    <span class="text-lg font-extrabold text-indigo-400">0.4%</span>
+                </div>
+
+                <div class="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+                            <i class="fa-solid fa-hand-holding-dollar text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-white">COD Refusal / Return Rate</p>
+                            <p class="text-[11px] text-slate-400">Orders rejected at doorstep</p>
+                        </div>
+                    </div>
+                    <span class="text-lg font-extrabold text-rose-400">1.2%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>

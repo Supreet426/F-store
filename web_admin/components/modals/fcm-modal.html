@@ -1,0 +1,36 @@
+<div id="modal-fcm-composer" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-paper-plane text-brand-400"></i> Broadcast FCM Push Notification
+        </h3>
+        <p class="text-xs text-slate-400">Send an immediate push notification to all customer app users</p>
+        <form id="form-fcm-broadcast" class="space-y-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="fcm-target-topic">Target Audience</label>
+                <select id="fcm-target-topic" class="input-field">
+                    <option value="all_users">All Registered Customers (all_users)</option>
+                    <option value="riders">Active Delivery Riders (riders)</option>
+                    <option value="merchants">Store Merchants (merchants)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="fcm-push-title">Notification Title</label>
+                <input type="text" id="fcm-push-title" required class="input-field" placeholder="⚡ Flash Sale Live Now!">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="fcm-push-body">Message Body</label>
+                <textarea id="fcm-push-body" rows="3" required class="input-field" placeholder="Flat 50% Off on all snacks for the next 2 hours! Tap to order now."></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="fcm-image-url">Image Banner URL (Optional)</label>
+                <input type="url" id="fcm-image-url" class="input-field" placeholder="https://...">
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button" onclick="closeFcmModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                <button type="submit" class="btn-primary text-xs px-5 py-2 flex items-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-paper-plane"></i> Send Broadcast
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

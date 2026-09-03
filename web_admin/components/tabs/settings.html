@@ -1,0 +1,20 @@
+<div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 max-w-2xl">
+    <h3 class="font-bold text-lg text-white mb-1">Customer App Header Deals Button</h3>
+    <p class="text-xs text-slate-400 mb-6">Customize top deal button text and action on customer home screen</p>
+
+    <form id="form-deals-button" class="space-y-4">
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1" for="deals-button-text">Button Text</label>
+            <input type="text" id="deals-button-text" class="input-field" placeholder="Flash-O Deals">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1" for="deals-button-action">Button Action</label>
+            <select id="deals-button-action" class="input-field">
+                <option value="flash_sale">Open Flash Sale</option>
+                <option value="trending">Open Trending Items</option>
+                <option value="offers">Open Special Offers</option>
+            </select>
+        </div>
+        <button type="submit" class="btn-primary text-xs px-6 py-2.5 cursor-pointer">Save Header Config</button>
+    </form>
+</div>

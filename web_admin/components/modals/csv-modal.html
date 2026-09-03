@@ -1,0 +1,20 @@
+<div id="modal-csv-import" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-file-import text-sky-400"></i> Import Products from CSV
+        </h3>
+        <p class="text-xs text-slate-400">Upload a CSV file containing columns: <code class="text-amber-400">title, category, price, mrp, quantity, isAvailable, imageUrl, description</code></p>
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-2" for="csv-file-input">Select CSV File</label>
+            <input type="file" id="csv-file-input" accept=".csv" class="input-field py-2 text-xs">
+        </div>
+        <div id="csv-preview-container" class="max-h-48 overflow-y-auto hidden text-xs font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <p id="csv-preview-summary" class="text-emerald-400 font-bold mb-2"></p>
+            <ul id="csv-preview-list" class="space-y-1 text-slate-300"></ul>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+            <button type="button" onclick="closeCsvModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+            <button type="button" onclick="processCsvImport()" id="btn-process-csv" disabled class="btn-primary text-xs px-5 py-2">Import Products</button>
+        </div>
+    </div>
+</div>

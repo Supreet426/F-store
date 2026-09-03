@@ -1,0 +1,99 @@
+<!-- Dedicated Merchant Home Dashboard -->
+<div class="space-y-6">
+    <!-- Store Header Banner -->
+    <div class="bg-gradient-to-r from-amber-900/40 via-slate-900 to-slate-900 p-6 rounded-3xl border border-amber-500/30 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xl">
+        <div class="flex items-center gap-4">
+            <div class="w-14 h-14 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center text-amber-400 text-2xl shrink-0 shadow-lg">
+                <i class="fa-solid fa-store"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h3 id="merchant-store-name" class="font-extrabold text-xl text-white">Merchant Partner Portal</h3>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider"><i class="fa-solid fa-circle-check mr-1"></i> Verified Store</span>
+                </div>
+                <p id="merchant-store-sub" class="text-xs text-slate-400 mt-0.5">Manage live store orders, inventory, pricing & outlet operations</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+            <div class="bg-slate-950 px-4 py-2 rounded-xl border border-slate-800 flex items-center gap-3">
+                <span class="text-xs font-semibold text-slate-400">Outlet Status:</span>
+                <span id="merchant-outlet-status" class="text-xs font-extrabold text-emerald-400 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> STORE OPEN</span>
+            </div>
+            <button onclick="openProductModal()" class="btn-primary text-xs px-4 py-2.5 flex items-center gap-2 cursor-pointer shadow-lg">
+                <i class="fa-solid fa-plus"></i> Add Product
+            </button>
+        </div>
+    </div>
+
+    <!-- Merchant Store KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div onclick="switchTab('orders')" class="p-5 bg-slate-900 border border-slate-800 hover:border-brand-500/50 rounded-2xl cursor-pointer hover:-translate-y-1 transition-all group shadow-lg">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Orders</span>
+                <div class="w-8 h-8 rounded-xl bg-brand-500/10 text-brand-400 flex items-center justify-center"><i class="fa-solid fa-receipt"></i></div>
+            </div>
+            <h4 id="merchant-kpi-orders" class="text-3xl font-extrabold text-white">0</h4>
+            <p class="text-[10px] text-slate-500 mt-1">Live customer orders received today</p>
+        </div>
+
+        <div class="p-5 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Total Sales</span>
+                <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+            </div>
+            <h4 id="merchant-kpi-sales" class="text-3xl font-extrabold text-emerald-400">₹0</h4>
+            <p class="text-[10px] text-slate-500 mt-1">Completed store revenue</p>
+        </div>
+
+        <div onclick="switchTab('products')" class="p-5 bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl cursor-pointer hover:-translate-y-1 transition-all group shadow-lg">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">Active Products</span>
+                <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center"><i class="fa-solid fa-box-open"></i></div>
+            </div>
+            <h4 id="merchant-kpi-products" class="text-3xl font-extrabold text-amber-400">0</h4>
+            <p class="text-[10px] text-slate-500 mt-1">Catalog items listed in store</p>
+        </div>
+
+        <div onclick="switchTab('dark-stores')" class="p-5 bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-2xl cursor-pointer hover:-translate-y-1 transition-all group shadow-lg">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-sky-400 uppercase tracking-wider">Store Outlet Hub</span>
+                <div class="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center"><i class="fa-solid fa-location-dot"></i></div>
+            </div>
+            <h4 id="merchant-kpi-hub" class="text-lg font-extrabold text-white truncate">Main Dark Store</h4>
+            <p class="text-[10px] text-slate-500 mt-1">Fulfillment hub assignment</p>
+        </div>
+    </div>
+
+    <!-- Quick Navigation Action Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div onclick="switchTab('orders')" class="p-5 bg-slate-900 border border-slate-800/80 hover:border-brand-500 rounded-2xl cursor-pointer transition-all flex items-center gap-4 group">
+            <div class="w-12 h-12 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div>
+                <h4 class="font-bold text-white text-sm">Live Order Board</h4>
+                <p class="text-xs text-slate-400">View & process incoming customer orders</p>
+            </div>
+        </div>
+
+        <div onclick="switchTab('products')" class="p-5 bg-slate-900 border border-slate-800/80 hover:border-amber-500 rounded-2xl cursor-pointer transition-all flex items-center gap-4 group">
+            <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-list-check"></i>
+            </div>
+            <div>
+                <h4 class="font-bold text-white text-sm">Products & Prices</h4>
+                <p class="text-xs text-slate-400">Manage stock quantities, discounts & prices</p>
+            </div>
+        </div>
+
+        <div onclick="switchTab('map')" class="p-5 bg-slate-900 border border-slate-800/80 hover:border-sky-500 rounded-2xl cursor-pointer transition-all flex items-center gap-4 group">
+            <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-map-location-dot"></i>
+            </div>
+            <div>
+                <h4 class="font-bold text-white text-sm">Delivery Map</h4>
+                <p class="text-xs text-slate-400">Track live rider dispatches to customers</p>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,104 @@
+/* Custom Dashboard Styles & Utilities for Flash-O Portal */
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #020617;
+}
+::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+}
+
+/* Navigation Button Styling */
+.nav-btn {
+    width: 100%;
+    display: flex;
+    items-center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #94a3b8;
+    border-radius: 0.75rem;
+    transition: all 0.2s ease-in-out;
+}
+.nav-btn:hover {
+    color: #ffffff;
+    background-color: rgba(30, 41, 59, 0.6);
+}
+.nav-btn.active {
+    color: #ffffff;
+    background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+    box-shadow: 0 10px 15px -3px rgba(225, 29, 72, 0.25);
+}
+
+/* KPI Cards */
+.kpi-card {
+    background-color: #0f172a;
+    border: 1px solid rgba(30, 41, 59, 0.8);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    transition: all 0.2s ease;
+}
+.kpi-card:hover {
+    border-color: rgba(51, 65, 85, 1);
+    transform: translateY(-2px);
+}
+
+/* Form Input Fields */
+.input-field {
+    width: 100%;
+    background-color: #020617;
+    border: 1px solid #1e293b;
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    color: #ffffff;
+    transition: border-color 0.2s ease;
+}
+.input-field:focus {
+    outline: none;
+    border-color: #f43f5e;
+}
+
+/* Buttons */
+.btn-primary {
+    background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+    color: #ffffff;
+    font-weight: 700;
+    border-radius: 0.75rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
+}
+.btn-primary:hover {
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+    box-shadow: 0 6px 16px rgba(225, 29, 72, 0.4);
+}
+
+/* Status Badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 9999px;
+    letter-spacing: 0.025em;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

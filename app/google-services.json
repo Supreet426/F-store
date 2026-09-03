@@ -1,0 +1,121 @@
+{
+  "project_info": {
+    "project_number": "216011846150",
+    "project_id": "fryumm-5c865",
+    "storage_bucket": "fryumm-5c865.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:216011846150:android:97eba9463dd26271c78987",
+        "android_client_info": {
+          "package_name": "com.fryumm"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "216011846150-mr3tt79m2kh9sdagv4ap1b3n1a50f88c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fryumm",
+            "certificate_hash": "df8e4f9b2f7f0ee26cde7dbfb1a8aef48648a34e"
+          }
+        },
+        {
+          "client_id": "216011846150-c3gne9t3c3t2angcqftb39vck8vm50nf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5TLXs7Nmdl9Qp27v7l0Brog2pMdD_3a4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "216011846150-c3gne9t3c3t2angcqftb39vck8vm50nf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:216011846150:android:7c44986064cb8504c78987",
+        "android_client_info": {
+          "package_name": "com.fryumm.partner"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "216011846150-1jd1ku68g8qqbi3dcqv3dn8tsmc6o3ol.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fryumm.partner",
+            "certificate_hash": "df8e4f9b2f7f0ee26cde7dbfb1a8aef48648a34e"
+          }
+        },
+        {
+          "client_id": "216011846150-c3gne9t3c3t2angcqftb39vck8vm50nf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5TLXs7Nmdl9Qp27v7l0Brog2pMdD_3a4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "216011846150-c3gne9t3c3t2angcqftb39vck8vm50nf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:216011846150:android:456ee4edba2fd71fc78987",
+        "android_client_info": {
+          "package_name": "com.fryumm.store"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "216011846150-na9fvvgpfjuf5l4823esf4dbn1aquk0m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fryumm.store",
+            "certificate_hash": "df8e4f9b2f7f0ee26cde7dbfb1a8aef48648a34e"
+          }
+        },
+        {
+          "client_id": "216011846150-c3gne9t3c3t2angcqftb39vck8vm50nf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5TLXs7Nmdl9Qp27v7l0Brog2pMdD_3a4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "216011846150-c3gne9t3c3t2angcqftb39vck8vm50nf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

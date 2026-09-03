@@ -1,0 +1,53 @@
+<div class="space-y-4">
+    <!-- INTERACTIVE KPI FILTER CARDS (Single Unified Filter Bar) -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        <div data-role="ALL" onclick="setFilterPill('ALL', this)" class="role-pill p-3.5 bg-brand-600 text-white border border-brand-500 rounded-2xl cursor-pointer hover:scale-[1.02] transition-all group shadow-lg">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-white/80">All Accounts</p>
+            <h4 id="kpi-total-users" class="text-2xl font-extrabold text-white mt-0.5">0</h4>
+        </div>
+        <div data-role="PENDING" onclick="setFilterPill('PENDING', this)" class="role-pill p-3.5 bg-slate-900 border border-amber-500/40 rounded-2xl cursor-pointer hover:scale-[1.02] transition-all group hover:bg-amber-500/10">
+            <p class="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-clock text-amber-400"></i> Pending</p>
+            <h4 id="kpi-pending-merchants" class="text-2xl font-extrabold text-amber-400 mt-0.5">0</h4>
+        </div>
+        <div data-role="MERCHANT" onclick="setFilterPill('MERCHANT', this)" class="role-pill p-3.5 bg-slate-900 border border-slate-800 rounded-2xl cursor-pointer hover:scale-[1.02] transition-all group hover:bg-slate-800">
+            <p class="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Merchants</p>
+            <h4 id="kpi-merchants" class="text-2xl font-extrabold text-amber-400 mt-0.5">0</h4>
+        </div>
+        <div data-role="CUSTOMER" onclick="setFilterPill('CUSTOMER', this)" class="role-pill p-3.5 bg-slate-900 border border-slate-800 rounded-2xl cursor-pointer hover:scale-[1.02] transition-all group hover:bg-slate-800">
+            <p class="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Customers</p>
+            <h4 id="kpi-customers" class="text-2xl font-extrabold text-emerald-400 mt-0.5">0</h4>
+        </div>
+        <div data-role="RIDER" onclick="setFilterPill('RIDER', this)" class="role-pill p-3.5 bg-slate-900 border border-slate-800 rounded-2xl cursor-pointer hover:scale-[1.02] transition-all group hover:bg-slate-800">
+            <p class="text-[10px] text-sky-400 font-bold uppercase tracking-wider">Riders</p>
+            <h4 id="kpi-riders" class="text-2xl font-extrabold text-sky-400 mt-0.5">0</h4>
+        </div>
+        <div data-role="ADMIN" onclick="setFilterPill('ADMIN', this)" class="role-pill p-3.5 bg-slate-900 border border-slate-800 rounded-2xl cursor-pointer hover:scale-[1.02] transition-all group hover:bg-slate-800">
+            <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Admins</p>
+            <h4 id="kpi-admins" class="text-2xl font-extrabold text-indigo-400 mt-0.5">0</h4>
+        </div>
+        <div data-role="OTHER" onclick="setFilterPill('OTHER', this)" class="role-pill p-3.5 bg-slate-900 border border-slate-800 rounded-2xl cursor-pointer hover:scale-[1.02] transition-all group hover:bg-slate-800">
+            <p class="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Tech Staff</p>
+            <h4 id="kpi-staff" class="text-2xl font-extrabold text-purple-400 mt-0.5">0</h4>
+        </div>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="bg-slate-900 border border-slate-800/80 rounded-2xl overflow-hidden shadow-lg mt-4">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-slate-950 text-xs uppercase text-slate-400 border-b border-slate-800">
+                <tr>
+                    <th class="p-4">User Profile</th>
+                    <th class="p-4">Mobile</th>
+                    <th class="p-4">Role & Verification</th>
+                    <th class="p-4">Account Status</th>
+                    <th class="p-4 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="userTableBody" class="divide-y divide-slate-800">
+                <tr><td colspan="5" class="p-8 text-center text-slate-400">Loading unified database...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>

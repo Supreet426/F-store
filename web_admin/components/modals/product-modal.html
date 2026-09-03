@@ -1,0 +1,101 @@
+<div id="modal-product" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-xl shadow-2xl space-y-4 my-auto">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <h3 id="modal-product-title" class="text-lg font-bold text-white">Add New Product</h3>
+            <button type="button" onclick="closeProductModal()" class="text-slate-400 hover:text-white text-lg cursor-pointer">&times;</button>
+        </div>
+        <form id="form-product" class="space-y-3">
+            <input type="hidden" id="product-id">
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="product-name">Product Name *</label>
+                <input type="text" id="product-name" required class="input-field" placeholder="Aloo Tikki Chaat">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="product-category">Category *</label>
+                    <input type="text" id="product-category" required class="input-field" placeholder="Snacks & Chaat">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="product-quantity">Quantity Unit *</label>
+                    <input type="text" id="product-quantity" required class="input-field" placeholder="1 Plate (2 Pcs) / 500g">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="product-price">Selling Price (₹) *</label>
+                    <input type="number" id="product-price" step="0.01" required class="input-field" placeholder="80">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="product-mrp">MRP Price (₹)</label>
+                    <input type="number" id="product-mrp" step="0.01" class="input-field" placeholder="100">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="product-stock-qty">Stock Quantity</label>
+                    <input type="number" id="product-stock-qty" class="input-field" placeholder="50" value="50">
+                </div>
+            </div>
+
+            <!-- Warehouse & GST Inventory Fields -->
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1" for="product-barcode">Barcode / EAN</label>
+                    <input type="text" id="product-barcode" class="input-field text-xs" placeholder="890123456789">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1" for="product-aisle">Aisle Slot</label>
+                    <input type="text" id="product-aisle" class="input-field text-xs" placeholder="A1" value="A1">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1" for="product-rack">Rack Slot</label>
+                    <input type="text" id="product-rack" class="input-field text-xs" placeholder="R1" value="R1">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1" for="product-tax-rate">GST Tax %</label>
+                    <input type="number" id="product-tax-rate" step="0.1" class="input-field text-xs" placeholder="5.0" value="5">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="product-hsn">HSN Code</label>
+                    <input type="text" id="product-hsn" class="input-field" placeholder="21069099">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="product-image">Image URL or Upload File</label>
+                    <div class="flex gap-2 items-center">
+                        <input type="url" id="product-image" class="input-field flex-1" placeholder="https://...">
+                        <label for="product-image-file" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs px-2.5 py-2 rounded-xl cursor-pointer flex items-center gap-1.5 shrink-0 font-medium transition-colors">
+                            <i class="fa-solid fa-cloud-arrow-up text-sky-400"></i>
+                        </label>
+                        <input type="file" id="product-image-file" accept="image/*" class="hidden">
+                    </div>
+                    <span id="upload-status-text" class="text-[10px] text-slate-400 mt-0.5 block"></span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="product-description">Description</label>
+                <textarea id="product-description" rows="2" class="input-field" placeholder="Crispy spiced potato patties served with mint chutneys."></textarea>
+            </div>
+
+            <div class="flex items-center gap-6 pt-1">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="product-in-stock" checked class="w-4 h-4 rounded accent-brand-500 cursor-pointer">
+                    <label for="product-in-stock" class="text-xs font-semibold text-white cursor-pointer">In Stock Available</label>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="product-is-food" class="w-4 h-4 rounded accent-emerald-500 cursor-pointer">
+                    <label for="product-is-food" class="text-xs font-semibold text-slate-300 cursor-pointer">FSSAI Food Product</label>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeProductModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white cursor-pointer">Cancel</button>
+                <button type="submit" class="btn-primary text-xs px-5 py-2 cursor-pointer">Save Product</button>
+            </div>
+        </form>
+    </div>
+</div>
