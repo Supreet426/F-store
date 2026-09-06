@@ -106,6 +106,9 @@
                         <button data-tab="dark-stores" class="nav-btn">
                             <i class="fa-solid fa-store w-5"></i> Dark Store Hubs
                         </button>
+                        <button data-tab="notifications" class="nav-btn">
+                            <i class="fa-solid fa-bell w-5 text-amber-400"></i> Notifications Center
+                        </button>
 
                         <button data-tab="users" class="nav-btn">
                             <i class="fa-solid fa-users w-5"></i> User Management
@@ -386,9 +389,32 @@
                                     <label class="block text-xs font-semibold text-slate-400 mb-1">Version Name</label>
                                     <input type="text" id="update-version-name" class="input-field" placeholder="1.1.0">
                                 </div>
+                                <!-- Direct APK Upload Box -->
+                                <div class="md:col-span-3 bg-slate-900/90 p-4 rounded-xl border border-slate-800 space-y-3">
+                                    <div class="flex items-center justify-between flex-wrap gap-2">
+                                        <label class="block text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                                            <i class="fa-solid fa-file-arrow-up text-brand-400"></i> Direct Upload APK File (Firebase Storage)
+                                        </label>
+                                        <span id="apk-upload-status" class="text-xs text-slate-400">Select a .apk file to upload directly</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <input type="file" id="apk-file-input" accept=".apk" class="hidden">
+                                        <button type="button" id="btn-trigger-apk-upload" onclick="document.getElementById('apk-file-input').click()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer border border-slate-700">
+                                            <i class="fa-solid fa-folder-open text-amber-400"></i> Choose APK File
+                                        </button>
+                                        <button type="button" id="btn-upload-apk" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                            <i class="fa-solid fa-cloud-arrow-up"></i> Upload to Firebase
+                                        </button>
+                                    </div>
+                                    <!-- Progress Bar -->
+                                    <div id="apk-progress-container" class="w-full bg-slate-800 rounded-full h-2 hidden overflow-hidden">
+                                        <div id="apk-progress-bar" class="bg-brand-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                    </div>
+                                </div>
+
                                 <div class="md:col-span-2">
                                     <label class="block text-xs font-semibold text-slate-400 mb-1">APK / Play Store Download URL</label>
-                                    <input type="url" id="update-download-url" class="input-field" placeholder="https://play.google.com/store/apps/details?id=com.flash-o.customer">
+                                    <input type="url" id="update-download-url" class="input-field" placeholder="https://firebasestorage.googleapis.com/... or https://play.google.com/...">
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <input type="checkbox" id="update-is-mandatory" class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-brand-600">
@@ -608,63 +634,169 @@
 
                     <!-- TAB 13: LIVE SUPPORT CHAT -->
                     <section id="tab-live-support" class="tab-content hidden h-[calc(100vh-120px)] overflow-hidden">
-                        <div class="flex h-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-                            <!-- Left: Sessions List -->
-                            <div class="w-80 border-r border-slate-800 flex flex-col bg-slate-950/20">
-                                <div class="p-5 border-b border-slate-800">
-                                    <h3 class="font-bold text-white">Active Support Sessions</h3>
-                                    <div class="flex gap-2 mt-3">
-                                        <button onclick="filterSupport('ALL')" id="filter-all" class="text-[9px] px-2 py-1 rounded bg-brand-600 text-white font-bold cursor-pointer">ALL</button>
-                                        <button onclick="filterSupport('MERCHANT')" id="filter-merchants" class="text-[9px] px-2 py-1 rounded bg-slate-800 text-slate-400 font-bold hover:text-white cursor-pointer">MERCHANTS</button>
-                                        <button onclick="filterSupport('CUSTOMER')" id="filter-customers" class="text-[9px] px-2 py-1 rounded bg-slate-800 text-slate-400 font-bold hover:text-white cursor-pointer">CUSTOMERS</button>
+                        ... (content truncated for brevity)
+                    </section>
+
+                    <!-- TAB 14: NOTIFICATIONS CENTER -->
+                    <section id="tab-notifications" class="tab-content hidden space-y-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <!-- Left: Push Broadcast Form -->
+                            <div class="lg:col-span-2 space-y-8">
+                                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-lg">
+                                    <div class="flex items-center gap-3 mb-6">
+                                        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
+                                            <i class="fa-solid fa-paper-plane text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-bold text-lg text-white">Broadcast Push Notification</h3>
+                                            <p class="text-xs text-slate-400">Send a system tray notification to all customers via FCM</p>
+                                        </div>
                                     </div>
+
+                                    <form id="form-broadcast-push" class="space-y-4">
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Target Audience</label>
+                                                <select id="push-target" class="input-field">
+                                                    <option value="all_customers">All Customers (all_customers)</option>
+                                                    <option value="active_customers">Active Customers (Last 30 Days)</option>
+                                                    <option value="inactive_customers">Inactive / Win-back Customers</option>
+                                                    <option value="riders">Delivery Riders (riders)</option>
+                                                    <option value="merchants">Store Merchants (merchants)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Notification Title</label>
+                                                <input type="text" id="push-title" required class="input-field" placeholder="e.g. Weekend Mega Sale!">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Deep Link / Action Screen</label>
+                                                <select id="push-action-preset" class="input-field mb-1.5 text-[11px]" onchange="document.getElementById('push-action').value = this.value">
+                                                    <option value="">-- Select Preset / Custom --</option>
+                                                    <option value="flash_sale">Flash Sale Screen (flash_sale)</option>
+                                                    <option value="categories">Categories Page (categories)</option>
+                                                    <option value="wallet">Wallet & Rewards (wallet)</option>
+                                                    <option value="home">Home Feed (home)</option>
+                                                </select>
+                                                <input type="text" id="push-action" class="input-field" placeholder="or custom (e.g. category/Dairy)">
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Message Body</label>
+                                            <textarea id="push-body" required rows="3" class="input-field" placeholder="e.g. Get 50% off on all items this Sunday..."></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Image URL (Optional)</label>
+                                            <div class="flex gap-2">
+                                                <input type="url" id="push-image" class="input-field flex-1" placeholder="https://...">
+                                                <button type="button" onclick="document.getElementById('push-image-file').click()" class="bg-slate-800 border border-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all shrink-0">
+                                                    <i class="fa-solid fa-upload mr-1"></i> Upload
+                                                </button>
+                                                <input type="file" id="push-image-file" accept="image/*" class="hidden">
+                                            </div>
+                                        </div>
+
+                                        <div class="pt-4 flex items-center justify-between border-t border-slate-800/50">
+                                            <div class="flex items-center gap-2">
+                                                <input type="checkbox" id="push-save-history" checked class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-brand-600">
+                                                <label for="push-save-history" class="text-[11px] font-semibold text-slate-400">Save to Notification History</label>
+                                            </div>
+                                            <button type="submit" class="btn-primary px-8 py-3 flex items-center gap-2 cursor-pointer shadow-xl shadow-brand-900/20">
+                                                <i class="fa-solid fa-paper-plane"></i>
+                                                <span class="font-black uppercase tracking-widest text-[11px]">Send Broadcast Now</span>
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <div id="support-sessions-list" class="flex-1 overflow-y-auto divide-y divide-slate-800/50">
-                                    <!-- Dynamic list of chat sessions -->
-                                    <div class="p-8 text-center text-slate-500">
-                                        <i class="fa-solid fa-spinner fa-spin text-2xl mb-3"></i>
-                                        <p class="text-xs">Loading sessions...</p>
+
+                                <!-- Popup Broadcast Alerts -->
+                                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-lg">
+                                    <div class="flex items-center gap-3 mb-6">
+                                        <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+                                            <i class="fa-solid fa-window-restore text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-bold text-lg text-white">In-App Popup Alerts</h3>
+                                            <p class="text-xs text-slate-400">Manage global popups for mobile apps and web portal</p>
+                                        </div>
                                     </div>
+
+                                    <div class="flex gap-4 mb-6">
+                                        <button onclick="switchPopupTab('app')" id="popup-tab-app" class="popup-tab-btn active px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all bg-brand-600 text-white shadow-md">Mobile App Popup</button>
+                                        <button onclick="switchPopupTab('web')" id="popup-tab-web" class="popup-tab-btn px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all bg-slate-800 text-slate-400 hover:text-white">Web Portal Popup</button>
+                                    </div>
+
+                                    <form id="form-popup-broadcast" class="space-y-4 bg-slate-950/40 p-5 rounded-2xl border border-slate-800/60">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="flex items-center gap-3">
+                                                <label class="relative inline-flex items-center cursor-pointer">
+                                                    <input type="checkbox" id="notif-popup-active" class="sr-only peer">
+                                                    <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                                </label>
+                                                <span class="text-xs font-bold text-white uppercase tracking-wider">Active Alert Status</span>
+                                            </div>
+                                            <span id="popup-target-label" class="text-[10px] font-black bg-slate-800 text-slate-400 px-3 py-1 rounded-full uppercase tracking-tighter border border-slate-700">Target: Mobile App</span>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Alert Heading</label>
+                                                <input type="text" id="notif-popup-title" class="input-field" placeholder="🎉 Festive Special Offer!">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Button Action URL</label>
+                                                <input type="text" id="notif-popup-action" class="input-field" placeholder="flash_sale">
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Message Content</label>
+                                            <textarea id="notif-popup-message" rows="2" class="input-field" placeholder="Detailed message about the promotion..."></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Promotion Banner URL</label>
+                                            <input type="url" id="notif-popup-image" class="input-field" placeholder="https://...">
+                                        </div>
+
+                                        <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-black uppercase tracking-widest text-[11px] py-3.5 rounded-xl border border-slate-700 transition-all cursor-pointer">
+                                            Update Popup Config
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
 
-                            <!-- Right: Chat Window -->
-                            <div class="flex-1 flex flex-col bg-slate-950/10">
-                                <div id="support-chat-header" class="h-16 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/50">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
-                                            <i class="fa-solid fa-user"></i>
-                                        </div>
-                                        <div>
-                                            <h4 id="chat-user-name" class="font-bold text-white text-sm">Select a session</h4>
-                                            <p id="chat-user-status" class="text-[10px] text-slate-500">Wait for merchant to message</p>
-                                        </div>
+                            <!-- Right: Notification History -->
+                            <div class="space-y-6">
+                                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-lg flex flex-col h-[600px]">
+                                    <div class="flex items-center justify-between mb-6 shrink-0">
+                                        <h3 class="font-bold text-white">Broadcast History</h3>
+                                        <button onclick="clearNotificationHistory()" class="text-[10px] font-bold text-rose-400 hover:text-rose-300 transition-colors uppercase">Clear All</button>
                                     </div>
-                                    <div class="flex gap-2">
-                                        <button onclick="resolveCurrentSession()" class="text-[10px] px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-all cursor-pointer">
-                                            Mark Resolved
-                                        </button>
-                                    </div>
-                                </div>
 
-                                <!-- Chat Messages Container -->
-                                <div id="support-messages-container" class="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col">
-                                    <div class="flex-1 flex items-center justify-center text-slate-500 opacity-50">
-                                        <div class="text-center">
-                                            <i class="fa-solid fa-headset text-5xl mb-4"></i>
-                                            <p class="text-sm">Flash-O Live Care Admin Panel</p>
+                                    <div id="notification-history-list" class="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                                        <div class="p-8 text-center text-slate-500 italic text-xs">
+                                            Loading history...
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Message Input -->
-                                <div class="p-4 bg-slate-900/50 border-t border-slate-800">
-                                    <form id="form-support-reply" class="flex gap-3">
-                                        <input type="text" id="support-reply-input" class="input-field flex-1" placeholder="Type your reply here..." disabled>
-                                        <button type="submit" id="btn-send-support" class="btn-primary w-12 h-10 flex items-center justify-center cursor-pointer" disabled>
-                                            <i class="fa-solid fa-paper-plane"></i>
-                                        </button>
-                                    </form>
+                                <!-- Preview Card -->
+                                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-lg">
+                                    <h3 class="font-bold text-white mb-4">Live Preview</h3>
+                                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/60">
+                                        <div class="flex items-start gap-3">
+                                            <div class="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center shrink-0">
+                                                <i class="fa-solid fa-bolt text-white text-xs"></i>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <p id="preview-title" class="text-sm font-bold text-white truncate">Notification Title</p>
+                                                <p id="preview-body" class="text-xs text-slate-400 mt-0.5 line-clamp-2">Message body will appear here...</p>
+                                            </div>
+                                        </div>
+                                        <div id="preview-image-container" class="mt-3 hidden">
+                                            <img id="preview-image" src="" alt="Notification Preview" class="w-full h-32 object-cover rounded-lg border border-slate-800">
+                                        </div>
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 mt-3 text-center italic font-medium">Standard System Tray Appearance</p>
                                 </div>
                             </div>
                         </div>
@@ -936,6 +1068,7 @@
                     'coupons': 'Coupons & Promo Offers',
                     'analytics': 'Analytics & Intelligence',
                     'map': 'Live Operations Map',
+                    'notifications': 'Notification & Broadcast Center',
                     'live-support': 'Flash-O Care Live Support',
                     'settings': 'System Settings',
                     'user-profile': 'User Profile Details & Governance'
@@ -1081,6 +1214,7 @@
     <script type="module" src="js/coupons.js"></script>
     <script type="module" src="js/app-control.js"></script>
     <script type="module" src="js/analytics.js"></script>
+    <script type="module" src="js/notifications.js"></script>
     <script type="module" src="js/map.js"></script>
     <script type="module">
         import { initSupportChat } from './js/support-live.js';
