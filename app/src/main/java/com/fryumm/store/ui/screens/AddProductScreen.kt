@@ -43,8 +43,24 @@ fun AddProductScreen(
     var searchNames by remember { mutableStateOf(productToEdit?.searchNames ?: emptyList<String>()) }
     var searchNameInput by remember { mutableStateOf("") }
     var description by remember { mutableStateOf(productToEdit?.description ?: "") }
+    val websiteCategories = remember {
+        listOf(
+            "Grocery", "Fruits & Vegetables", "Dairy & Eggs", "Bakery & Biscuits",
+            "Beverages", "Snacks & Munchies", "Instant Food", "Meat & Seafood",
+            "Personal Care", "Home & Cleaning", "Baby Care", "Pet Care",
+            "Electronics", "Pharmacy", "Stationery", "Kitchen & Dining", "Paan Corner"
+        )
+    }
+
     var shortDescription by remember { mutableStateOf(productToEdit?.shortDescription ?: "") }
     var category by remember { mutableStateOf(productToEdit?.category ?: prefilledCategory ?: "") }
+    var isCustomCategory by remember { 
+        mutableStateOf(
+            category.isNotBlank() && 
+            !websiteCategories.contains(category) && 
+            !viewModel.dynamicAppConfig.categorySequence.contains(category)
+        ) 
+    }
     
     var originalPrice by remember { mutableStateOf(productToEdit?.originalPrice?.toString() ?: "") }
     var basePrice by remember { mutableStateOf(productToEdit?.basePrice?.toString() ?: "") }
@@ -89,6 +105,7 @@ fun AddProductScreen(
     var legalDisclaimer by remember { mutableStateOf(productToEdit?.legalDisclaimer ?: "") }
     var nutritionalInfo by remember { mutableStateOf(productToEdit?.nutritionalInfo ?: "") }
     var adminFeedback by remember { mutableStateOf(productToEdit?.adminFeedback ?: "") }
+    var specifications by remember { mutableStateOf(productToEdit?.specifications ?: emptyMap<String, String>()) }
 
     var showCategorySheet by remember { mutableStateOf(false) }
 
@@ -198,6 +215,8 @@ fun AddProductScreen(
                     CategoryUnitSection(
                         category = category,
                         onCategoryClick = { showCategorySheet = true },
+                        onCategoryChange = { category = it },
+                        isCategoryEditable = isCustomCategory,
                         unitType = unitType,
                         onUnitTypeChange = { unitType = it },
                         measurementUnit = measurementUnit,
@@ -312,6 +331,13 @@ fun AddProductScreen(
                         canEditPricing = canEditPricing
                     )
                 }
+
+                item {
+                    SpecificationsSection(
+                        specifications = specifications,
+                        onSpecificationsChange = { specifications = it }
+                    )
+                }
             }
 
             Button(
@@ -380,6 +406,7 @@ fun AddProductScreen(
                             imageUrl = productImages.firstOrNull() ?: "",
                             images = productImages,
                             availableCoupons = coupons,
+                            specifications = specifications,
                             isVerified = isAdmin,
                             adminFeedback = adminFeedback,
                             addedAt = productToEdit?.addedAt ?: System.currentTimeMillis(),
@@ -416,12 +443,23 @@ fun AddProductScreen(
             viewModel.products.map { it.category }.distinct().filter { it.isNotBlank() }
         }
         val allCategories = remember(existingCategories, catalogCategories) {
-            (catalogCategories + existingCategories).distinct().sorted()
+            (websiteCategories + catalogCategories + existingCategories)
+                .distinct()
+                .filter { it != "Other" }
+                .sorted() + "Other"
         }
 
         CategorySelectorSheet(
             onDismiss = { showCategorySheet = false },
-            onCategorySelected = { category = it },
+            onCategorySelected = { 
+                if (it == "Other") {
+                    isCustomCategory = true
+                    category = ""
+                } else {
+                    isCustomCategory = false
+                    category = it
+                }
+            },
             categories = allCategories,
             isAdmin = isAdmin,
             onAddCategory = { viewModel.addCategory(it) }

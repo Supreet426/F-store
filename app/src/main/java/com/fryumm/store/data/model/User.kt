@@ -50,6 +50,7 @@ data class UserProfile(
     val bankAccountName: String = "",
     val bankAccountNumber: String = "",
     val bankIfscCode: String = "",
+    val upiId: String = "", // Added for free UPI Payouts
     
     // Detailed Address
     val storeAddress: String = "",
@@ -71,6 +72,9 @@ data class UserProfile(
     val staffDepartment: String = "", // e.g., "Helpline & Support", "Cancellation Management", "Website Management", "Advertisement & Marketing", "Technical Operations"
     val staffPermissions: List<String> = emptyList(),
 
+    // Device & Security
+    val deviceId: String = "",
+
     // Role Change Request System
     val requestedRole: String = "",
     val roleChangeReason: String = "",
@@ -79,9 +83,7 @@ data class UserProfile(
     @get:Exclude
     val userRole: UserRole
         get() {
-            val emailLower = email.lowercase().trim()
-            val masterAdmins = listOf("ranjanamishra1117@gmail.com", "supreet.mishr@gmail.com")
-            if (masterAdmins.contains(emailLower)) {
+            if (com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(email)) {
                 return UserRole.ADMIN
             }
             val r = role.lowercase().trim()

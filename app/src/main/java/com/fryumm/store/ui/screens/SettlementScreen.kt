@@ -1,5 +1,8 @@
 package com.fryumm.store.ui.screens
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,6 +23,7 @@ import androidx.navigation.NavHostController
 import com.fryumm.store.ui.viewmodels.StoreViewModel
 import com.fryumm.store.data.model.MerchantSettlement
 import com.fryumm.store.data.model.UserRole
+import com.fryumm.store.data.model.UserProfile
 import com.fryumm.store.ui.theme.FStorePurple
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,6 +31,7 @@ import com.fryumm.store.ui.theme.FStorePurple
 fun SettlementScreen(viewModel: StoreViewModel, navController: NavHostController) {
     val settlements = remember { viewModel.getMerchantSettlements() }
     val isAdmin = viewModel.currentUserProfile?.userRole == UserRole.ADMIN || viewModel.isMasterAdmin
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -58,7 +64,17 @@ fun SettlementScreen(viewModel: StoreViewModel, navController: NavHostController
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(settlements) { settlement ->
-                    MerchantSettlementCard(settlement, isAdmin)
+                    val merchantProfile = viewModel.allUsers.find { it.uid == settlement.merchantId }
+                    MerchantSettlementCard(settlement, isAdmin, merchantProfile) { amount, vpa, name ->
+                        if (vpa.isBlank()) {
+                            Toast.makeText(context, "Merchant UPI ID not found!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val uri = Uri.parse("upi://pay?pa=$vpa&pn=$name&am=$amount&cu=INR&tn=Flash-O Settlement for ${settlement.totalOrders} orders")
+                            val intent = Intent(Intent.ACTION_VIEW, uri)
+                            val chooser = Intent.createChooser(intent, "Pay with...")
+                            context.startActivity(chooser)
+                        }
+                    }
                 }
             }
         }
@@ -66,7 +82,12 @@ fun SettlementScreen(viewModel: StoreViewModel, navController: NavHostController
 }
 
 @Composable
-fun MerchantSettlementCard(settlement: MerchantSettlement, isAdmin: Boolean) {
+fun MerchantSettlementCard(
+    settlement: MerchantSettlement, 
+    isAdmin: Boolean, 
+    merchantProfile: UserProfile? = null,
+    onSettleClick: (Double, String, String) -> Unit = { _, _, _ -> }
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -121,16 +142,34 @@ fun MerchantSettlementCard(settlement: MerchantSettlement, isAdmin: Boolean) {
             }
             
             if (isAdmin) {
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = { /* Implement Mark as Paid logic if needed */ },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A237E)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("MARK AS SETTLED")
+                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { 
+                            onSettleClick(
+                                settlement.totalPayout, 
+                                merchantProfile?.upiId ?: "", 
+                                merchantProfile?.name ?: settlement.merchantName
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Payment, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("PAY VIA UPI")
+                    }
+                    
+                    OutlinedButton(
+                        onClick = { /* Implement Mark as Paid logic if needed */ },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("MARK SETTLED")
+                    }
                 }
             }
         }

@@ -67,12 +67,16 @@ class IncomingOrderActivity : ComponentActivity() {
         val orderId = intent.getStringExtra("orderId") ?: "Unknown"
         val customerName = intent.getStringExtra("customerName") ?: "New Customer"
         val amount = intent.getStringExtra("amount") ?: "0.0"
+        val itemSummary = intent.getStringExtra("itemSummary") ?: ""
+        val itemCount = intent.getStringExtra("itemCount") ?: ""
 
         setContent {
             FStoreTheme {
                 IncomingOrderScreen(
                     customerName = customerName,
                     amount = amount,
+                    itemSummary = itemSummary,
+                    itemCount = itemCount,
                     onAccept = { 
                         CoroutineScope(Dispatchers.IO).launch {
                             orderRepository.updateOrderFields(orderId, mapOf("status" to OrderStatus.ACCEPTED))
@@ -130,6 +134,8 @@ class IncomingOrderActivity : ComponentActivity() {
 fun IncomingOrderScreen(
     customerName: String,
     amount: String,
+    itemSummary: String = "",
+    itemCount: String = "",
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
@@ -141,22 +147,23 @@ fun IncomingOrderScreen(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 24.dp)
         ) {
             Surface(
                 shape = CircleShape,
                 color = Color.White.copy(alpha = 0.2f),
-                modifier = Modifier.size(120.dp)
+                modifier = Modifier.size(110.dp)
             ) {
                 Icon(
                     Icons.Default.ShoppingBag,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.padding(24.dp).fillMaxSize()
+                    modifier = Modifier.padding(22.dp).fillMaxSize()
                 )
             }
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
             Text(
                 "NEW ORDER RECEIVED!",
@@ -165,20 +172,52 @@ fun IncomingOrderScreen(
                 fontWeight = FontWeight.Bold
             )
             
+            Spacer(modifier = Modifier.height(4.dp))
+
             Text(
                 customerName,
                 color = Color.White,
-                fontSize = 28.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Black
             )
             
             Text(
-                "Amount: ₹$amount",
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 18.sp
+                "Total Amount: ₹$amount",
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
             )
+
+            if (itemSummary.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                    color = Color.White.copy(alpha = 0.15f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = if (itemCount.isNotEmpty()) "Your Products to Pack ($itemCount items):" else "Your Products to Pack:",
+                            color = Color.Yellow,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = itemSummary,
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
             
-            Spacer(modifier = Modifier.height(64.dp))
+            Spacer(modifier = Modifier.height(48.dp))
             
             Row(
                 modifier = Modifier.fillMaxWidth(),

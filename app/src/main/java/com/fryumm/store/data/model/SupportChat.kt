@@ -19,7 +19,10 @@ data class SupportSession(
     val lastMessage: String = "",
     val lastTimestamp: Long = System.currentTimeMillis(),
     val isUnreadByAdmin: Boolean = true,
-    val isActive: Boolean = true
+    val isUnreadByUser: Boolean = false,
+    val isActive: Boolean = true,
+    val assignedAdminId: String? = null,
+    val assignedAdminName: String? = null
 )
 
 data class SupportRequest(

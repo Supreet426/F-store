@@ -1,11 +1,17 @@
 package com.fryumm.store.ui.viewmodels
 
 import android.app.Application
+import android.content.Intent
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fryumm.store.data.model.*
@@ -13,12 +19,16 @@ import com.fryumm.store.data.repository.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
+import java.io.File
+import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 
@@ -39,13 +49,13 @@ class StoreViewModel @Inject constructor(
         data class ShowSuccess(val message: String) : UiEvent()
     }
 
-    val masterAdmins = listOf("ranjanamishra1117@gmail.com", "supreet.mishr@gmail.com")
+    val masterAdmins = com.fryumm.store.util.MasterAdminSecurity.MASTER_ADMIN_EMAILS
 
     var currentUserProfile by mutableStateOf<UserProfile?>(null)
         private set
 
     val isMasterAdmin: Boolean
-        get() = currentUserProfile?.email?.lowercase()?.trim() in masterAdmins
+        get() = com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(currentUserProfile?.email)
 
     var isAuthLoading by mutableStateOf(true)
         private set
@@ -75,6 +85,14 @@ class StoreViewModel @Inject constructor(
         private set
     var darkStores by mutableStateOf<List<DarkStore>>(emptyList())
         private set
+
+    var userSegmentationReport by mutableStateOf(UserSegmentationReport())
+        private set
+
+    var lowStockProducts by mutableStateOf<List<Product>>(emptyList())
+        private set
+
+    private val notifiedLowStockIds = mutableSetOf<String>()
 
     private val _uiEvent = MutableSharedFlow<UiEvent>()
     val uiEvent: SharedFlow<UiEvent> = _uiEvent.asSharedFlow()
@@ -154,6 +172,33 @@ class StoreViewModel @Inject constructor(
                 }
 
                 currentUserProfile?.let { profile ->
+                    if (com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(profile.email)) {
+                        val context = getApplication<Application>().applicationContext
+                        val activeDeviceId = com.fryumm.store.util.MasterAdminSecurity.getDeviceId(context)
+                        val verification = com.fryumm.store.util.MasterAdminSecurity.verifyAdminSession(
+                            context = context,
+                            profile = profile,
+                            currentEmail = currentUser.email ?: profile.email,
+                            currentPhone = profile.phoneNumber,
+                            currentDeviceId = activeDeviceId
+                        )
+                        if (!verification.isVerified) {
+                            auth.signOut()
+                            currentUserProfile = null
+                            _uiEvent.emit(UiEvent.ShowError(verification.message))
+                            isAuthLoading = false
+                            return@launch
+                        }
+                        if (profile.deviceId.isBlank() && activeDeviceId.isNotBlank()) {
+                            try {
+                                firestore.collection("users").document(profile.uid).update("deviceId", activeDeviceId).await()
+                                currentUserProfile = profile.copy(deviceId = activeDeviceId)
+                            } catch (e: Exception) {
+                                Log.e("StoreViewModel", "Failed to update admin deviceId", e)
+                            }
+                        }
+                    }
+
                     if (profile.uid.isNotEmpty()) {
                         val tokenRole = when (profile.userRole) {
                             UserRole.ADMIN -> "admin"
@@ -161,6 +206,7 @@ class StoreViewModel @Inject constructor(
                             else -> "seller"
                         }
                         notificationRepository.updateToken(profile.uid, tokenRole)
+                        toggleServicesBasedOnRole(profile)
                     }
                 }
                 filterOrders()
@@ -179,6 +225,22 @@ class StoreViewModel @Inject constructor(
             } finally {
                 isAuthLoading = false
             }
+        }
+    }
+
+    private fun toggleServicesBasedOnRole(profile: UserProfile) {
+        val context = getApplication<Application>().applicationContext
+        
+        // Rider Tracking Service
+        val locationIntent = Intent(context, com.fryumm.store.RiderLocationService::class.java)
+        if (profile.userRole == UserRole.RIDER && profile.active) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(locationIntent)
+            } else {
+                context.startService(locationIntent)
+            }
+        } else {
+            context.stopService(locationIntent)
         }
     }
 
@@ -241,9 +303,17 @@ class StoreViewModel @Inject constructor(
 
     private fun observeDynamicConfig() {
         viewModelScope.launch {
-            firestore.collection("app_config").document("config")
+            firestore.collection("app_config").document("config_app")
                 .addSnapshotListener { snapshot, _ ->
-                    snapshot?.toObject(DynamicAppConfig::class.java)?.let { dynamicAppConfig = it }
+                    if (snapshot != null && snapshot.exists()) {
+                        snapshot.toObject(DynamicAppConfig::class.java)?.let { dynamicAppConfig = it }
+                    } else {
+                        // Fallback to legacy config document
+                        firestore.collection("app_config").document("config")
+                            .addSnapshotListener { legacySnapshot, _ ->
+                                legacySnapshot?.toObject(DynamicAppConfig::class.java)?.let { dynamicAppConfig = it }
+                            }
+                    }
                 }
         }
     }
@@ -260,7 +330,10 @@ class StoreViewModel @Inject constructor(
     private fun observeCustomers() {
         viewModelScope.launch {
             firestore.collection("customers").addSnapshotListener { snapshot, _ ->
-                snapshot?.let { allCustomers = it.toObjects(CustomerProfile::class.java) }
+                snapshot?.let { 
+                    allCustomers = it.toObjects(CustomerProfile::class.java) 
+                    generateUserSegmentationReport()
+                }
             }
         }
     }
@@ -288,7 +361,8 @@ class StoreViewModel @Inject constructor(
                 } ?: emptyList()
 
                 snapshotListeners[collectionName] = users
-                val combined = snapshotListeners.values.flatten().distinctBy { it.uid }
+                val combined = snapshotListeners.values.flatten()
+                    .distinctBy { if (it.email.isNotBlank()) it.email.lowercase().trim() else it.uid }
                 allUsers = combined
 
                 val activeRiders = combined.filter { it.userRole == UserRole.RIDER && it.active }
@@ -304,10 +378,20 @@ class StoreViewModel @Inject constructor(
         orders = if (isAdmin) {
             rawOrders
         } else {
-            if (profile.userRole == UserRole.RIDER) {
-                rawOrders.filter { it.deliveryAgentId == profile.uid }
-            } else {
-                rawOrders.filter { it.sellerId == profile.uid }
+            when (profile.userRole) {
+                UserRole.RIDER -> rawOrders.filter { it.deliveryAgentId == profile.uid }
+                UserRole.CUSTOMER -> emptyList()
+                else -> {
+                    // MERCHANT or DARK STORE
+                    rawOrders.filter { order ->
+                        order.sellerId == profile.uid ||
+                        (!profile.darkStoreId.isNullOrEmpty() && order.sellerId == profile.darkStoreId) ||
+                        order.items.any { item ->
+                            item.product.sellerId == profile.uid ||
+                            (!profile.darkStoreId.isNullOrEmpty() && item.product.sellerId == profile.darkStoreId)
+                        }
+                    }
+                }
             }
         }.sortedByDescending { it.timestamp }
     }
@@ -320,6 +404,44 @@ class StoreViewModel @Inject constructor(
         } else {
             rawProducts.filter { it.sellerId == profile.uid }
         }.sortedBy { it.sequenceNumber }
+
+        // Update low stock list
+        lowStockProducts = products.filter { it.stockQuantity <= it.minStockLevel }
+
+        // Trigger notifications if Admin
+        if (isAdmin) {
+            checkAndNotifyLowStock()
+        }
+    }
+
+    private fun checkAndNotifyLowStock() {
+        viewModelScope.launch {
+            lowStockProducts.forEach { product ->
+                if (!notifiedLowStockIds.contains(product.id) && product.stockQuantity <= product.minStockLevel) {
+                    val title = "Low Stock Alert: ${product.name}"
+                    val body = "${product.name} is running low (${product.stockQuantity} remaining at ${product.sellerName})."
+                    notificationRepository.sendNotification(
+                        userId = currentUserProfile?.uid ?: "",
+                        title = title,
+                        body = body,
+                        actionUrl = "inventory_alerts"
+                    )
+                    notifiedLowStockIds.add(product.id)
+                }
+            }
+        }
+    }
+
+    fun remindSellerAboutStock(product: Product) {
+        viewModelScope.launch {
+            notificationRepository.sendNotification(
+                userId = product.sellerId,
+                title = "Restock Request: ${product.name}",
+                body = "Admin has noticed that ${product.name} is low on stock (${product.stockQuantity} units left). Please restock soon.",
+                actionUrl = "inventory"
+            )
+            _uiEvent.emit(UiEvent.ShowSuccess("Reminder sent to ${product.sellerName}"))
+        }
     }
 
     // AUTH
@@ -366,8 +488,8 @@ class StoreViewModel @Inject constructor(
     }
 
     fun register(email: String, pass: String, name: String, phone: String, customRole: UserRole? = null, staffDepartment: String? = null) {
-        if (customRole == UserRole.ADMIN && !isMasterAdmin) {
-            viewModelScope.launch { _uiEvent.emit(UiEvent.ShowError("SECURITY ALERT: Only Master Admins can create Admins")) }
+        if (customRole == UserRole.ADMIN) {
+            viewModelScope.launch { _uiEvent.emit(UiEvent.ShowError("SECURITY ALERT: Admin role cannot be assigned to new accounts.")) }
             return
         }
         if (phone.length < 10) {
@@ -377,10 +499,36 @@ class StoreViewModel @Inject constructor(
         isAuthLoading = true
         viewModelScope.launch {
             try {
-                val result = auth.createUserWithEmailAndPassword(email, pass).await()
+                val cleanPhone = phone.trim()
+                val cleanEmail = email.trim().lowercase()
+                val roleStr = customRole?.name ?: "STORE_OWNER"
+
+                if (roleStr == "CUSTOMER") {
+                    val existingPhone1 = firestore.collection("customers").whereEqualTo("phoneNumber", cleanPhone).get().await()
+                    val existingPhone2 = firestore.collection("customers").whereEqualTo("mobile", cleanPhone).get().await()
+                    val existingCustomerDoc = existingPhone1.documents.firstOrNull() ?: existingPhone2.documents.firstOrNull()
+
+                    if (existingCustomerDoc != null) {
+                        val existingEmail = existingCustomerDoc.getString("email")?.takeIf { it.isNotBlank() } ?: cleanEmail
+                        try {
+                            if (existingEmail.isNotEmpty()) {
+                                auth.signInWithEmailAndPassword(existingEmail, pass).await()
+                                setupSession()
+                                _uiEvent.emit(UiEvent.ShowSuccess("Existing account found for Mobile $cleanPhone. Logged in successfully!"))
+                                return@launch
+                            }
+                        } catch (loginEx: Exception) {
+                            Log.e("StoreViewModel", "Auto-login to existing customer failed", loginEx)
+                            _uiEvent.emit(UiEvent.ShowError("An account with Mobile $cleanPhone already exists ($existingEmail). Please check your password or log in."))
+                            isAuthLoading = false
+                            return@launch
+                        }
+                    }
+                }
+
+                val result = auth.createUserWithEmailAndPassword(cleanEmail, pass).await()
                 val user = result.user
                 if (user != null) {
-                    val roleStr = customRole?.name ?: "STORE_OWNER"
                     val targetCollection = when (roleStr) {
                         "ADMIN" -> "users"
                         "RIDER" -> "riders"
@@ -390,16 +538,16 @@ class StoreViewModel @Inject constructor(
                     }
                     val newProfile = UserProfile(
                         uid = user.uid,
-                        email = email,
+                        email = cleanEmail,
                         name = name,
                         role = roleStr,
-                        phoneNumber = phone,
+                        phoneNumber = cleanPhone,
                         staffDepartment = staffDepartment ?: if (roleStr == "OTHER") "General Operations" else ""
                     )
                     firestore.collection(targetCollection).document(user.uid).set(newProfile).await()
                     currentUserProfile = newProfile
                     setupSession()
-                    _uiEvent.emit(UiEvent.ShowSuccess("Account Created for $phone"))
+                    _uiEvent.emit(UiEvent.ShowSuccess("Account Created for $cleanPhone"))
                 }
             } catch (e: Exception) {
                 _uiEvent.emit(UiEvent.ShowError("Registration Failed: ${e.message}"))
@@ -458,8 +606,100 @@ class StoreViewModel @Inject constructor(
         viewModelScope.launch { orderRepository.updateOrderFields(orderId, mapOf("status" to OrderStatus.PICKING)) }
     }
 
+    fun requestSubstitute(orderId: String, substituteProduct: Product) {
+        viewModelScope.launch {
+            try {
+                val updates = mapOf(
+                    "substituteRequested" to true,
+                    "substituteProductId" to substituteProduct.id,
+                    "substituteProductName" to substituteProduct.name,
+                    "substituteStatus" to SubstituteStatus.PENDING,
+                    "stockReservedUntil" to System.currentTimeMillis() + (15 * 60 * 1000)
+                )
+                orderRepository.updateOrderFields(orderId, updates).onSuccess {
+                    _uiEvent.emit(UiEvent.ShowSuccess("Substitute requested for Order #${orderId.takeLast(6)}"))
+                }.onFailure {
+                    _uiEvent.emit(UiEvent.ShowError("Failed to update order for substitute"))
+                }
+            } catch (e: Exception) {
+                _uiEvent.emit(UiEvent.ShowError("Error requesting substitute"))
+            }
+        }
+    }
+
     fun printInvoice(order: Order) {
-        Log.d("StoreViewModel", "Printing invoice for order: ${order.id}")
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val context = getApplication<Application>().applicationContext
+                val pdfDocument = PdfDocument()
+                val paint = Paint()
+                val titlePaint = Paint().apply {
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    textSize = 18f
+                }
+                val textPaint = Paint().apply {
+                    textSize = 12f
+                }
+
+                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 Size
+                val page = pdfDocument.startPage(pageInfo)
+                val canvas = page.canvas
+
+                var y = 40f
+                canvas.drawText("FLASH-O STORE INVOICE", 200f, y, titlePaint)
+                y += 40f
+                canvas.drawText("Order ID: ${order.id}", 50f, y, textPaint)
+                y += 20f
+                canvas.drawText("Customer: ${order.customerName}", 50f, y, textPaint)
+                y += 20f
+                canvas.drawText("Phone: ${order.phoneNumber}", 50f, y, textPaint)
+                y += 20f
+                val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                canvas.drawText("Date: ${sdf.format(Date(order.timestamp))}", 50f, y, textPaint)
+                y += 40f
+
+                canvas.drawText("Items:", 50f, y, titlePaint)
+                y += 25f
+                
+                order.items.forEach { item ->
+                    val text = "${item.product.name} x ${item.quantity} = ₹${item.product.price * item.quantity}"
+                    canvas.drawText(text, 70f, y, textPaint)
+                    y += 20f
+                }
+
+                y += 20f
+                canvas.drawText("--------------------------------------------------", 50f, y, textPaint)
+                y += 20f
+                canvas.drawText("Subtotal: ₹${order.totalPrice}", 50f, y, textPaint)
+                y += 20f
+                canvas.drawText("Delivery: ₹${order.deliveryCharge}", 50f, y, textPaint)
+                y += 20f
+                canvas.drawText("Platform Fee: ₹${order.handlingFee}", 50f, y, textPaint)
+                y += 20f
+                canvas.drawText("Discount: -₹${order.discountAmount}", 50f, y, textPaint)
+                y += 25f
+                canvas.drawText("TOTAL AMOUNT: ₹${order.totalAmount}", 50f, y, titlePaint)
+
+                pdfDocument.finishPage(page)
+
+                val file = File(context.cacheDir, "invoice_${order.id}.pdf")
+                file.outputStream().use { 
+                    pdfDocument.writeTo(it)
+                }
+                pdfDocument.close()
+
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/pdf")
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+                
+            } catch (e: Exception) {
+                Log.e("StoreViewModel", "PDF Generation Error", e)
+                viewModelScope.launch { _uiEvent.emit(UiEvent.ShowError("Print Failed: ${e.message}")) }
+            }
+        }
     }
 
     fun getNearbyRiders(merchantLat: Double?, merchantLon: Double?): List<Pair<Rider, Int>> {
@@ -931,6 +1171,35 @@ class StoreViewModel @Inject constructor(
     fun setSimulatedEnvironment(weather: Double, event: Double) {
         simulatedWeatherImpact = weather
         simulatedEventImpact = event
+
+        // Sync to Dynamic App Config for Customers
+        val updatedConfig = dynamicAppConfig.copy(
+            weatherImpact = weather,
+            eventImpact = event,
+            lastUpdated = System.currentTimeMillis()
+        )
+        updateDynamicConfig(updatedConfig)
+
+        // Update analytics based on simulation
+        val currentAnalytics = customerBehaviorAnalytics
+        val surge = if (weather > 7.0 || event > 7.0) "High Surge" else if (weather > 3.0 || event > 3.0) "Rising" else "Normal"
+        val loadFactor = 1.0 + (weather * 0.05) + (event * 0.1)
+        
+        customerBehaviorAnalytics = currentAnalytics.copy(
+            weatherImpactScore = weather,
+            eventImpactScore = event,
+            surgeStatus = surge,
+            activitySurgePercentage = (weather + event) * 5.0,
+            preparationPlan = currentAnalytics.preparationPlan?.copy(
+                estimatedLoadFactor = loadFactor,
+                suggestedRiders = (loadFactor * 5).toInt(),
+                suggestedPickers = (loadFactor * 3).toInt()
+            ) ?: PreparationPlan(
+                estimatedLoadFactor = loadFactor,
+                suggestedRiders = (loadFactor * 5).toInt(),
+                suggestedPickers = (loadFactor * 3).toInt()
+            )
+        )
     }
 
     fun rapidInventoryPrep() {
@@ -955,6 +1224,12 @@ class StoreViewModel @Inject constructor(
             try {
                 // Determine collection based on existing role
                 val user = allUsers.find { it.uid == uid } ?: return@launch
+                if (com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(user.email) || user.userRole == UserRole.ADMIN) {
+                    if (!active) {
+                        _uiEvent.emit(UiEvent.ShowError("SECURITY PROTECTION: Master Admin accounts cannot be blocked or deactivated!"))
+                        return@launch
+                    }
+                }
                 val collection = when(user.userRole) {
                     UserRole.ADMIN -> "users"
                     UserRole.RIDER -> "riders"
@@ -987,76 +1262,168 @@ class StoreViewModel @Inject constructor(
         }
     }
 
-    fun getAdvancedAnalytics(): AdvancedAnalytics {
-        val totalOrdersCount = orders.size
-        val totalSearches = searchEvents.size.coerceAtLeast(totalOrdersCount * 3)
-        val productViews = customerEvents.count { it.eventType == "VIEW_PRODUCT" }.coerceAtLeast(totalOrdersCount * 2)
-        val addToCarts = customerEvents.count { it.eventType == "ADD_TO_CART" }.coerceAtLeast((totalOrdersCount * 1.5).toInt())
-        val checkouts = customerEvents.count { it.eventType == "CHECKOUT_INITIATED" }.coerceAtLeast((totalOrdersCount * 1.2).toInt())
-        val deliveredOrders = orders.count { it.status == OrderStatus.DELIVERED }
+    fun getAdvancedAnalytics(
+        targetOrders: List<Order> = orders,
+        targetSearches: List<SearchEvent> = searchEvents,
+        targetEvents: List<CustomerActivityEvent> = customerEvents,
+        targetCustomers: List<CustomerProfile> = allCustomers,
+        targetProducts: List<Product> = products
+    ): AdvancedAnalytics {
+        val totalOrdersCount = targetOrders.size
+        val totalSearches = targetSearches.size
+        val productViews = targetEvents.count { 
+            it.eventType == CustomerEventType.VIEW_PRODUCT || it.eventType == "VIEW_PRODUCT" 
+        }
+        val addToCarts = targetEvents.count { 
+            it.eventType == CustomerEventType.ADD_TO_CART || it.eventType == "ADD_TO_CART" 
+        }
+        val checkouts = targetEvents.count { 
+            it.eventType == CustomerEventType.CHECKOUT_STARTED || it.eventType == "CHECKOUT_INITIATED" || it.eventType == "CHECKOUT" 
+        }
+        val deliveredOrders = targetOrders.count { it.status == OrderStatus.DELIVERED }
+
+        val baseFunnelCount = totalSearches.coerceAtLeast(productViews).coerceAtLeast(totalOrdersCount)
 
         val funnel = listOf(
-            FunnelStep("Product Search", totalSearches, 100f),
-            FunnelStep("Product Clicks", productViews, if (totalSearches > 0) (productViews.toFloat() / totalSearches * 100) else 0f),
-            FunnelStep("Add to Cart", addToCarts, if (totalSearches > 0) (addToCarts.toFloat() / totalSearches * 100) else 0f),
-            FunnelStep("Checkout Initiated", checkouts, if (totalSearches > 0) (checkouts.toFloat() / totalSearches * 100) else 0f),
-            FunnelStep("Orders Placed", totalOrdersCount, if (totalSearches > 0) (totalOrdersCount.toFloat() / totalSearches * 100) else 0f),
-            FunnelStep("Delivered", deliveredOrders, if (totalSearches > 0) (deliveredOrders.toFloat() / totalSearches * 100) else 0f)
+            FunnelStep("Product Search", totalSearches, if (baseFunnelCount > 0) (totalSearches.toFloat() / baseFunnelCount * 100).coerceAtMost(100f) else 0f),
+            FunnelStep("Product Clicks", productViews, if (baseFunnelCount > 0) (productViews.toFloat() / baseFunnelCount * 100).coerceAtMost(100f) else 0f),
+            FunnelStep("Add to Cart", addToCarts, if (productViews > 0) (addToCarts.toFloat() / productViews * 100).coerceAtMost(100f) else if (baseFunnelCount > 0) (addToCarts.toFloat() / baseFunnelCount * 100) else 0f),
+            FunnelStep("Checkout Initiated", checkouts, if (addToCarts > 0) (checkouts.toFloat() / addToCarts * 100).coerceAtMost(100f) else 0f),
+            FunnelStep("Orders Placed", totalOrdersCount, if (checkouts > 0) (totalOrdersCount.toFloat() / checkouts * 100).coerceAtMost(100f) else 0f),
+            FunnelStep("Delivered", deliveredOrders, if (totalOrdersCount > 0) (deliveredOrders.toFloat() / totalOrdersCount * 100) else 0f)
         )
 
-        val zeroSearches = searchEvents.filter { it.resultCount == 0 }
+        val zeroSearches = targetSearches.filter { it.resultCount == 0 }
             .groupBy { it.query.lowercase().trim() }
             .map { (q, evs) -> ZeroResultSearch(q, evs.size) }
             .sortedByDescending { it.count }
             .take(10)
 
-        val oosProducts = products.filter { it.stockQuantity <= 0 }
-        val lowStockProducts = products.filter { it.stockQuantity in 1..5 }
-        val deadStockProducts = products.filter { it.stockQuantity > 50 }
+        val oosProducts = targetProducts.filter { it.stockQuantity <= 0 || !it.isInStock }
+        val lowStockProducts = targetProducts.filter { it.stockQuantity in 1..(it.minStockLevel.coerceAtLeast(5)) }
+        val deadStockProducts = targetProducts.filter { p -> p.stockQuantity > 20 && targetOrders.flatMap { it.items }.none { it.product.id == p.id } }
+        val expiredProducts = targetProducts.filter { it.expiryDate != null && it.expiryDate!! < System.currentTimeMillis() }
 
-        val deliveredList = orders.filter { it.status == OrderStatus.DELIVERED }
-        val avgDeliveryTime = if (deliveredList.isNotEmpty()) {
-            deliveredList.mapNotNull { it.deliveryTime?.minus(it.timestamp)?.div(60000) }.let {
-                if (it.isNotEmpty()) it.average().toInt().coerceIn(8, 25) else 12
+        // Best & Worst Sellers from targetOrders items
+        val soldItemsMap = mutableMapOf<String, Pair<String, Pair<Int, Double>>>()
+        targetOrders.flatMap { it.items }.forEach { item ->
+            val pId = item.product.id.ifEmpty { item.product.name }
+            val current = soldItemsMap[pId] ?: Pair(item.product.name, Pair(0, 0.0))
+            val newQty = current.second.first + item.quantity
+            val newRev = current.second.second + (item.product.price * item.quantity)
+            soldItemsMap[pId] = Pair(item.product.name.ifEmpty { current.first }, Pair(newQty, newRev))
+        }
+
+        val bestSellersList = soldItemsMap.values
+            .map { (name, qtyRev) -> ProductAnalysis(productName = name, totalSold = qtyRev.first, revenue = qtyRev.second) }
+            .sortedByDescending { it.revenue }
+            .take(5)
+
+        val worstSellersList = targetProducts
+            .filter { it.stockQuantity > 0 }
+            .map { p ->
+                val sold = soldItemsMap[p.id]?.second?.first ?: 0
+                val rev = soldItemsMap[p.id]?.second?.second ?: 0.0
+                ProductAnalysis(productName = p.name, totalSold = sold, revenue = rev)
             }
-        } else 11
+            .sortedBy { it.totalSold }
+            .take(5)
 
-        val paymentSplit = orders.groupBy { it.paymentMethod }
+        // Co-Purchased Bundle Suggestions
+        val pairCounts = mutableMapOf<Pair<String, String>, Int>()
+        targetOrders.forEach { order ->
+            val itemNames = order.items.map { it.product.name.ifEmpty { it.product.id } }.distinct()
+            if (itemNames.size >= 2) {
+                for (i in itemNames.indices) {
+                    for (j in i + 1 until itemNames.size) {
+                        val pair = if (itemNames[i] < itemNames[j]) Pair(itemNames[i], itemNames[j]) else Pair(itemNames[j], itemNames[i])
+                        pairCounts[pair] = (pairCounts[pair] ?: 0) + 1
+                    }
+                }
+            }
+        }
+        val bundleSuggestions = pairCounts.entries
+            .sortedByDescending { it.value }
+            .take(5)
+            .map { BundleSuggestion(products = listOf(it.key.first, it.key.second), support = it.value) }
+
+        val deliveredList = targetOrders.filter { it.status == OrderStatus.DELIVERED }
+        val avgDeliveryTime = if (deliveredList.isNotEmpty()) {
+            deliveredList.mapNotNull { order ->
+                order.deliveryTime?.minus(order.timestamp)?.div(60000)
+            }.let {
+                if (it.isNotEmpty()) it.average().toInt().coerceIn(5, 60) else 12
+            }
+        } else 12
+
+        val lateDeliveries = targetOrders.count { order ->
+            val totalMins = (order.deliveryTime ?: System.currentTimeMillis()) - order.timestamp
+            totalMins > 15 * 60 * 1000L
+        }
+
+        val qcFailures = targetOrders.count { it.status == OrderStatus.RETURNED || it.substituteRequested }
+        val qcFailureRate = if (targetOrders.isNotEmpty()) (qcFailures.toFloat() / targetOrders.size * 100) else 0f
+
+        val paymentSplit = targetOrders.groupBy { it.paymentMethod.ifEmpty { "COD" } }
             .mapValues { it.value.size }
 
-        val repeatCount = allCustomers.count { it.totalOrders > 1 }
-        val repeatRate = if (allCustomers.isNotEmpty()) (repeatCount.toFloat() / allCustomers.size * 100) else 0f
-        val avgLtv = if (allCustomers.isNotEmpty()) allCustomers.map { it.lifetimeSpending }.average() else 0.0
+        val paymentFailures = targetEvents.count { it.eventType == CustomerEventType.PAYMENT_FAILED }
+        val paymentStarts = targetEvents.count { it.eventType == CustomerEventType.PAYMENT_STARTED || it.eventType == CustomerEventType.CHECKOUT_STARTED }.coerceAtLeast(1)
+        val paymentFailureRate = (paymentFailures.toFloat() / paymentStarts * 100).coerceIn(0f, 100f)
+
+        val repeatCount = targetCustomers.count { it.totalOrders > 1 }
+        val repeatRate = if (targetCustomers.isNotEmpty()) (repeatCount.toFloat() / targetCustomers.size * 100) else 0f
+        val avgLtv = if (targetCustomers.isNotEmpty()) targetCustomers.map { it.lifetimeSpending }.average() else 0.0
+
+        val demandPredictions = targetProducts.take(10).map { product ->
+            val soldUnits = soldItemsMap[product.id]?.second?.first ?: 0
+            val predictedDemand = (soldUnits * 1.5).toInt().coerceAtLeast(5)
+            val recommendation = when {
+                product.stockQuantity <= 0 -> "Restock Immediately (OOS)"
+                product.stockQuantity < product.minStockLevel -> "Low Stock - Order Soon"
+                product.stockQuantity > product.minStockLevel * 5 -> "Overstocked"
+                else -> "Healthy Stock"
+            }
+            DemandPrediction(
+                productName = product.name,
+                productId = product.id,
+                currentStock = product.stockQuantity,
+                predictedDemand = predictedDemand,
+                confidence = 0.85f,
+                recommendation = recommendation
+            )
+        }
 
         return AdvancedAnalytics(
             funnel = funnel,
             zeroResultSearches = zeroSearches,
             abandonmentRate = if (addToCarts > 0) ((addToCarts - totalOrdersCount).toFloat() / addToCarts * 100).coerceAtLeast(0f) else 0f,
-            bundleSuggestions = emptyList(),
+            bundleSuggestions = bundleSuggestions,
             operational = OperationalStats(
                 avgPickingTimeMinutes = 3,
                 avgPackingTimeMinutes = 2,
-                qcFailureRate = 0.5f,
+                qcFailureRate = qcFailureRate,
                 avgRiderWaitTimeMinutes = 2,
                 avgDeliveryTimeMinutes = avgDeliveryTime,
-                lateDeliveries = orders.count { (it.deliveryTime ?: 0L) - it.timestamp > 20 * 60 * 1000L }
+                lateDeliveries = lateDeliveries
             ),
             productIntelligence = ProductIntelligence(
-                bestSellers = emptyList(),
-                worstSellers = emptyList(),
+                bestSellers = bestSellersList,
+                worstSellers = worstSellersList,
                 outOfStock = oosProducts,
                 lowStock = lowStockProducts,
                 deadStock = deadStockProducts,
-                expiredProducts = emptyList()
+                expiredProducts = expiredProducts
             ),
+            demandPredictions = demandPredictions,
             retention = RetentionStats(
                 repeatPurchaseRate = repeatRate,
                 averageLTV = avgLtv,
-                inactiveUsersCount = allCustomers.count { it.totalOrders == 0 }
+                inactiveUsersCount = targetCustomers.count { it.totalOrders == 0 }
             ),
             payment = PaymentStats(
                 methodSplit = paymentSplit,
-                failureRate = 1.2f
+                failureRate = paymentFailureRate
             )
         )
     }
@@ -1083,71 +1450,302 @@ class StoreViewModel @Inject constructor(
         )
     }
 
-    fun getMarketingAnalytics(): MarketingAnalytics {
-        val totalRev = orders.filter { it.status == OrderStatus.DELIVERED }.sumOf { it.totalAmount }
-        val pushSent = orders.size * 5
-        val bannerClicks = (orders.size * 2.5).toInt()
-        val promoOrders = orders.count { !it.couponCode.isNullOrEmpty() }
+    fun getMarketingAnalytics(
+        targetOrders: List<Order> = orders,
+        targetEvents: List<CustomerActivityEvent> = customerEvents,
+        targetCustomers: List<CustomerProfile> = allCustomers
+    ): MarketingAnalytics {
+        val deliveredOrders = targetOrders.filter { it.status == OrderStatus.DELIVERED }
+        val couponOrdersMap = targetOrders.filter { !it.couponCode.isNullOrEmpty() }
+            .groupBy { it.couponCode!! }
+
+        val campaignsList = couponOrdersMap.map { (code, oList) ->
+            val oCount = oList.size
+            val oRev = oList.filter { it.status == OrderStatus.DELIVERED }.sumOf { it.totalAmount }
+            val promoEvents = targetEvents.filter { it.details.contains(code, ignoreCase = true) }
+            val sent = promoEvents.count { it.eventType == CustomerEventType.CAMPAIGN_SENT || it.eventType == CustomerEventType.NOTIFICATION_RECEIVED }.coerceAtLeast(oCount * 4)
+            val opened = promoEvents.count { it.eventType == CustomerEventType.CAMPAIGN_OPENED || it.eventType == CustomerEventType.NOTIFICATION_CLICKED }.coerceAtLeast((oCount * 2))
+            val clicked = promoEvents.count { it.eventType == CustomerEventType.CAMPAIGN_CLICKED || it.eventType == CustomerEventType.COUPON_APPLIED }.coerceAtLeast(oCount)
+
+            CampaignStats(
+                campaignName = "Promo $code",
+                sentCount = sent,
+                openedCount = opened,
+                clickedCount = clicked,
+                orderCount = oCount,
+                totalRevenue = oRev
+            )
+        }.sortedByDescending { it.totalRevenue }
+
+        val totalCampaignRev = targetOrders.filter { !it.couponCode.isNullOrEmpty() && it.status == OrderStatus.DELIVERED }
+            .sumOf { it.totalAmount }
+
+        val sourceCounts = targetCustomers
+            .map { it.acquisitionSource?.ifEmpty { "Organic / Direct" } ?: "Organic / Direct" }
+            .groupBy { it }
+            .mapValues { it.value.size }
+
+        val totalAcquired = targetCustomers.size.coerceAtLeast(1)
+        val sourceSplit = sourceCounts.mapValues { ((it.value.toDouble() / totalAcquired) * 100).toInt() }
+
+        val sentEvents = targetEvents.count { it.eventType == CustomerEventType.CAMPAIGN_SENT || it.eventType == CustomerEventType.NOTIFICATION_RECEIVED }.coerceAtLeast(targetCustomers.size)
+        val openedEvents = targetEvents.count { it.eventType == CustomerEventType.CAMPAIGN_OPENED || it.eventType == CustomerEventType.NOTIFICATION_CLICKED }
+        val clickedEvents = targetEvents.count { it.eventType == CustomerEventType.CAMPAIGN_CLICKED || it.eventType == CustomerEventType.BANNER_CLICKED || it.eventType == CustomerEventType.COUPON_APPLIED }
+        val promoOrdersCount = targetOrders.count { !it.couponCode.isNullOrEmpty() }
 
         return MarketingAnalytics(
-            topCampaigns = listOf(
-                CampaignStats("Welcom100 Promo", sentCount = pushSent, openedCount = (pushSent * 0.4).toInt(), clickedCount = bannerClicks, orderCount = promoOrders, totalRevenue = totalRev * 0.25),
-                CampaignStats("Weekend Quick Deal", sentCount = (pushSent * 0.8).toInt(), openedCount = (pushSent * 0.3).toInt(), clickedCount = (bannerClicks * 0.7).toInt(), orderCount = (promoOrders * 0.5).toInt(), totalRevenue = totalRev * 0.18)
-            ),
-            totalCampaignRevenue = totalRev * 0.43,
-            sourceSplit = mapOf("Push Notification" to 45, "In-App Banners" to 30, "Smart Deals" to 15, "Referrals" to 10),
-            overallFunnel = MarketingFunnel(sent = pushSent, opened = (pushSent * 0.4).toInt(), clicked = bannerClicks, ordered = promoOrders)
+            topCampaigns = campaignsList.ifEmpty {
+                listOf(
+                    CampaignStats(
+                        campaignName = "Organic & General Direct Sales",
+                        sentCount = sentEvents,
+                        openedCount = openedEvents,
+                        clickedCount = clickedEvents,
+                        orderCount = promoOrdersCount,
+                        totalRevenue = totalCampaignRev
+                    )
+                )
+            },
+            totalCampaignRevenue = totalCampaignRev,
+            sourceSplit = sourceSplit.ifEmpty { mapOf("Organic / Direct" to 100) },
+            overallFunnel = MarketingFunnel(
+                sent = sentEvents,
+                opened = openedEvents,
+                clicked = clickedEvents,
+                ordered = promoOrdersCount
+            )
         )
     }
 
-    fun getFraudAnalytics(): FraudAnalytics {
-        val riskyUsers = allCustomers.filter { it.totalOrders > 3 && it.lifetimeSpending < 200 }
-        val incidents = riskyUsers.map { user ->
-            FraudIncident(
-                customerId = user.id,
-                customerName = user.name,
-                reason = "Potential Coupon / Refund Abuse",
-                riskLevel = RiskLevel.HIGH,
-                evidence = "High cancellation/refund requests with low order net value"
+    fun generateUserSegmentationReport(): UserSegmentationReport {
+        val currentTime = System.currentTimeMillis()
+        val segmentsMap = mutableMapOf<UserSegment, MutableList<CustomerProfile>>()
+        UserSegment.entries.forEach { segmentsMap[it] = mutableListOf() }
+
+        allCustomers.forEach { customer ->
+            val segment = when {
+                customer.isBlacklisted || customer.cancelledOrders > 5 || customer.returnedOrders > 3 -> UserSegment.RISKY
+                customer.totalOrders > 15 || (customer.lifetimeSpending > 5000 && customer.isSubscribed) -> UserSegment.LOYAL
+                customer.avgOrderValue > 800 || customer.lifetimeSpending > 10000 -> UserSegment.VIP
+                customer.cartAbandonedItemsCount > 2 -> UserSegment.ABANDONERS
+                customer.joinedDate > currentTime - (7 * 24 * 60 * 60 * 1000L) -> UserSegment.NEW
+                customer.lastOrderDate != null && customer.lastOrderDate!! < currentTime - (60 * 24 * 60 * 60 * 1000L) -> UserSegment.DORMANT
+                customer.lastLogin < currentTime - (30 * 24 * 60 * 60 * 1000L) -> UserSegment.INACTIVE
+                customer.totalOrders in 1..5 && customer.avgCustomerRating >= 4.5 -> UserSegment.POTENTIAL
+                else -> UserSegment.UNSEGMENTED
+            }
+            segmentsMap[segment]?.add(customer)
+        }
+
+        val counts = segmentsMap.mapValues { it.value.size }
+        val topSegment = counts.maxByOrNull { it.value }?.key ?: UserSegment.UNSEGMENTED
+
+        val report = UserSegmentationReport(
+            segments = segmentsMap,
+            counts = counts,
+            totalCustomers = allCustomers.size,
+            topSegment = topSegment
+        )
+        userSegmentationReport = report
+        return report
+    }
+
+    fun getMarketingInsights(): List<SegmentMarketingInsight> {
+        return listOf(
+            SegmentMarketingInsight(UserSegment.LOYAL, "Offer early access to new launches", "LOYALTY10", 2),
+            SegmentMarketingInsight(UserSegment.INACTIVE, "Win back with heavy discount", "COMEBACK50", 1),
+            SegmentMarketingInsight(UserSegment.ABANDONERS, "Reminder with free delivery", "FINISHCART", 1),
+            SegmentMarketingInsight(UserSegment.NEW, "Welcome kit and trial pass", "WELCOMEFLASH", 3),
+            SegmentMarketingInsight(UserSegment.VIP, "Personalized concierge service", null, 2),
+            SegmentMarketingInsight(UserSegment.POTENTIAL, "Upsell with Flash-O Pass", "PASSTRIAL", 4)
+        )
+    }
+
+    fun sendSegmentedCampaign(segment: UserSegment, title: String, message: String) {
+        val targetUsers = userSegmentationReport.segments[segment]?.map { it.id } ?: emptyList()
+        if (targetUsers.isNotEmpty()) {
+            sendTargetedCampaign(targetUsers, title, message)
+        } else {
+            viewModelScope.launch { _uiEvent.emit(UiEvent.ShowError("No users found in segment ${segment.displayName}")) }
+        }
+    }
+
+    fun getTargetingListForSegment(segment: UserSegment): List<Pair<String, String>> {
+        return userSegmentationReport.segments[segment]?.map { 
+            it.name to (it.mobile.ifEmpty { it.email }) 
+        } ?: emptyList()
+    }
+
+    fun exportSegmentToCsv(segment: UserSegment): String {
+        val customers = userSegmentationReport.segments[segment] ?: return ""
+        val header = "Name,Mobile,Email,TotalOrders,LifetimeSpending,LastOrderDate\n"
+        val body = customers.joinToString("\n") { 
+            "${it.name},${it.mobile},${it.email},${it.totalOrders},${it.lifetimeSpending},${it.lastOrderDate ?: 0}"
+        }
+        return header + body
+    }
+
+    fun getFraudAnalytics(
+        targetOrders: List<Order> = orders,
+        targetCustomers: List<CustomerProfile> = allCustomers
+    ): FraudAnalytics {
+        val multipleAccountsIncidents = mutableListOf<FraudIncident>()
+        val couponAbuseIncidents = mutableListOf<FraudIncident>()
+        val highReturnersIncidents = mutableListOf<FraudIncident>()
+        val codAbuseIncidents = mutableListOf<FraudIncident>()
+        val referralFraudIncidents = mutableListOf<FraudIncident>()
+        val gpsAnomalyIncidents = mutableListOf<FraudIncident>()
+        val paymentSuspicionIncidents = mutableListOf<FraudIncident>()
+
+        targetCustomers.forEach { customer ->
+            if (customer.isDuplicateDeviceDetected || customer.registrationDuplicateFlags.isNotEmpty()) {
+                multipleAccountsIncidents.add(
+                    FraudIncident(
+                        customerId = customer.id,
+                        customerName = customer.name.ifEmpty { "Customer #${customer.id.take(6)}" },
+                        reason = "Duplicate Device / Account Detected",
+                        riskLevel = RiskLevel.CRITICAL,
+                        evidence = customer.registrationDuplicateFlags.joinToString(", ").ifEmpty { "Multiple accounts linked to device ID" }
+                    )
+                )
+            }
+
+            if (customer.referralEarningsFrozen || customer.referralVerificationStatus == "REJECTED_FRAUD") {
+                referralFraudIncidents.add(
+                    FraudIncident(
+                        customerId = customer.id,
+                        customerName = customer.name.ifEmpty { "Customer #${customer.id.take(6)}" },
+                        reason = "Frozen / Suspicious Referral Claims",
+                        riskLevel = RiskLevel.HIGH,
+                        evidence = customer.referralEarningsFreezeReason.ifEmpty { "Referral verification failed for suspicious self-referrals" }
+                    )
+                )
+            }
+
+            if (customer.returnedOrders >= 2 || (customer.totalOrders > 3 && (customer.returnedOrders.toDouble() / customer.totalOrders) > 0.3)) {
+                highReturnersIncidents.add(
+                    FraudIncident(
+                        customerId = customer.id,
+                        customerName = customer.name.ifEmpty { "Customer #${customer.id.take(6)}" },
+                        reason = "High Return / Refund Rate",
+                        riskLevel = RiskLevel.MEDIUM,
+                        evidence = "${customer.returnedOrders} returned orders out of ${customer.totalOrders} total purchases"
+                    )
+                )
+            }
+
+            if (customer.cancelledOrders >= 3 || (customer.totalOrders > 3 && customer.lifetimeSpending < 100)) {
+                couponAbuseIncidents.add(
+                    FraudIncident(
+                        customerId = customer.id,
+                        customerName = customer.name.ifEmpty { "Customer #${customer.id.take(6)}" },
+                        reason = "Frequent Cancellations / Coupon Abuse",
+                        riskLevel = RiskLevel.HIGH,
+                        evidence = "${customer.cancelledOrders} cancelled orders with low order fulfillment spending"
+                    )
+                )
+            }
+
+            if (customer.isBlacklisted) {
+                paymentSuspicionIncidents.add(
+                    FraudIncident(
+                        customerId = customer.id,
+                        customerName = customer.name.ifEmpty { "Customer #${customer.id.take(6)}" },
+                        reason = "Blacklisted Account",
+                        riskLevel = RiskLevel.CRITICAL,
+                        evidence = "Account blacklisted due to security policy violations"
+                    )
+                )
+            }
+        }
+
+        val codCancelledUserIds = targetOrders
+            .filter { it.paymentMethod == "COD" && it.status == OrderStatus.CANCELLED }
+            .map { it.customerName }
+            .groupBy { it }
+            .filter { it.value.size >= 2 }
+
+        codCancelledUserIds.forEach { (cName, list) ->
+            codAbuseIncidents.add(
+                FraudIncident(
+                    customerId = cName,
+                    customerName = cName,
+                    reason = "Repeated COD Order Cancellations",
+                    riskLevel = RiskLevel.HIGH,
+                    evidence = "${list.size} COD orders cancelled after dispatch/placed"
+                )
             )
         }
+
+        val allIncidents = (multipleAccountsIncidents + couponAbuseIncidents + highReturnersIncidents +
+                codAbuseIncidents + referralFraudIncidents + gpsAnomalyIncidents + paymentSuspicionIncidents).distinctBy { it.customerId + it.reason }
+
+        val totalFlagged = allIncidents.size
+        val totalRisk = targetCustomers.filter { c -> allIncidents.any { it.customerId == c.id } }
+            .sumOf { it.lifetimeSpending }.coerceAtLeast(totalFlagged * 200.0)
+
         return FraudAnalytics(
-            totalFlaggedUsers = incidents.size,
-            totalRiskAmount = incidents.size * 450.0,
-            multipleAccounts = incidents.take(2),
-            referralFraud = incidents.drop(2).take(2),
-            couponAbuse = incidents,
-            highReturners = emptyList(),
-            codAbuse = emptyList(),
-            gpsAnomaly = emptyList(),
-            paymentSuspicion = emptyList()
+            totalFlaggedUsers = totalFlagged,
+            totalRiskAmount = totalRisk,
+            multipleAccounts = multipleAccountsIncidents,
+            referralFraud = referralFraudIncidents,
+            couponAbuse = couponAbuseIncidents,
+            highReturners = highReturnersIncidents,
+            codAbuse = codAbuseIncidents,
+            gpsAnomaly = gpsAnomalyIncidents,
+            paymentSuspicion = paymentSuspicionIncidents
         )
     }
 
-    fun getBusinessKPIs(): BusinessKPIs {
-        val delivered = orders.filter { it.status == OrderStatus.DELIVERED }
+    fun getBusinessKPIs(
+        targetOrders: List<Order> = orders,
+        targetCustomers: List<CustomerProfile> = allCustomers,
+        targetProducts: List<Product> = products
+    ): BusinessKPIs {
+        val delivered = targetOrders.filter { it.status == OrderStatus.DELIVERED }
         val gmv = delivered.sumOf { it.totalAmount }
-        val totalCount = delivered.size.coerceAtLeast(1)
-        val aov = gmv / totalCount
-        val totalCustomersCount = allCustomers.size.coerceAtLeast(1)
-        val repeatCustomers = allCustomers.count { it.totalOrders > 1 }
+        val totalDeliveredCount = delivered.size.coerceAtLeast(1)
+        val aov = if (delivered.isNotEmpty()) gmv / totalDeliveredCount else 0.0
+
+        val totalCustomersCount = targetCustomers.size.coerceAtLeast(1)
+        val repeatCustomers = targetCustomers.count { it.totalOrders > 1 }
         val repeatRate = (repeatCustomers.toDouble() / totalCustomersCount) * 100
-        val cancelCount = orders.count { it.status == OrderStatus.CANCELLED }
-        val returnCount = orders.count { it.status == OrderStatus.RETURNED }
-        val totalAllOrders = orders.size.coerceAtLeast(1)
+
+        val cancelCount = targetOrders.count { it.status == OrderStatus.CANCELLED }
+        val returnCount = targetOrders.count { it.status == OrderStatus.RETURNED }
+        val totalAllOrders = targetOrders.size.coerceAtLeast(1)
+
+        val grossProfit = delivered.sumOf { order ->
+            if (order.estimatedProfit > 0) order.estimatedProfit else order.totalAmount * 0.18
+        }
+
+        val totalDiscounts = delivered.sumOf { it.discountAmount }
+        val totalFees = delivered.sumOf { it.deliveryCharge + it.handlingFee }
+        val contributionMargin = grossProfit + totalFees - totalDiscounts
+
+        val netProfit = contributionMargin - (delivered.size * 20.0)
+
+        val totalPromoDiscounts = targetOrders.sumOf { it.discountAmount }
+        val acquiredCustomersWithOrders = targetCustomers.count { it.totalOrders >= 1 }.coerceAtLeast(1)
+        val cac = totalPromoDiscounts / acquiredCustomersWithOrders
+
+        val ltv = if (targetCustomers.isNotEmpty()) gmv / totalCustomersCount else 0.0
+
+        val campaignRev = targetOrders.filter { !it.couponCode.isNullOrEmpty() && it.status == OrderStatus.DELIVERED }.sumOf { it.totalAmount }
+        val roas = if (totalPromoDiscounts > 0) campaignRev / totalPromoDiscounts else 0.0
 
         return BusinessKPIs(
-            cac = 120.0,
-            ltv = if (allCustomers.isNotEmpty()) gmv / totalCustomersCount * 3.5 else 450.0,
-            roas = 4.2,
+            cac = cac,
+            ltv = ltv,
+            roas = roas,
             avgBasketSize = aov,
             repeatPurchaseRate = repeatRate,
-            retentionRate = 68.5,
+            retentionRate = repeatRate,
             cancellationRate = (cancelCount.toDouble() / totalAllOrders) * 100,
             returnRate = (returnCount.toDouble() / totalAllOrders) * 100,
-            grossProfit = gmv * 0.22,
-            netProfit = gmv * 0.12,
-            contributionMargin = gmv * 0.15
+            grossProfit = grossProfit,
+            netProfit = netProfit,
+            contributionMargin = contributionMargin
         )
     }
 
@@ -1161,6 +1759,10 @@ class StoreViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val user = allUsers.find { it.uid == uid } ?: return@launch
+                if (com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(user.email) || user.userRole == UserRole.ADMIN) {
+                    _uiEvent.emit(UiEvent.ShowError("SECURITY PROTECTION: Master Admin accounts cannot be deleted or removed under any circumstances."))
+                    return@launch
+                }
                 val collection = when(user.userRole) {
                     UserRole.ADMIN -> "users"
                     UserRole.RIDER -> "riders"
@@ -1244,19 +1846,65 @@ class StoreViewModel @Inject constructor(
 
     fun repairEcosystem() {
         viewModelScope.launch {
-            _uiEvent.emit(UiEvent.ShowSuccess("Home Ecosystem Repaired"))
+            try {
+                val defaultCatSeq = listOf("Grocery", "Fruits", "Vegetables", "Dairy", "Bakery", "Beverages", "Snacks", "Meat", "Personal Care", "Household")
+                val defaultHomeSeq = listOf("Flash Sale", "Priority Brands", "Grocery", "Fruits", "Dairy", "Promoted Sellers")
+                val newConfig = dynamicAppConfig.copy(
+                    categorySequence = defaultCatSeq,
+                    homeSectionOrder = defaultHomeSeq,
+                    lastUpdated = System.currentTimeMillis()
+                )
+                firestore.collection("settings").document("dynamic_app_config").set(newConfig).await()
+                dynamicAppConfig = newConfig
+                _uiEvent.emit(UiEvent.ShowSuccess("Home Ecosystem Repaired: Default categories and sections restored."))
+            } catch (e: Exception) {
+                _uiEvent.emit(UiEvent.ShowError("Repair Failed: ${e.message}"))
+            }
         }
     }
 
     fun addMarketTrendProducts() {
         viewModelScope.launch {
-            _uiEvent.emit(UiEvent.ShowSuccess("100 Trend Products Added"))
+            try {
+                val trending = listOf(
+                    Product(name = "Amul Taaza Milk", category = "Dairy", price = 28.0, unit = "500ml", stockQuantity = 100, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Harvest Gold Bread", category = "Bakery", price = 45.0, unit = "400g", stockQuantity = 50, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Farm Fresh Eggs", category = "Dairy", price = 84.0, unit = "12 pcs", stockQuantity = 30, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Basmati Rice", category = "Grocery", price = 120.0, unit = "1kg", stockQuantity = 200, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Maggi Noodles", category = "Snacks", price = 14.0, unit = "70g", stockQuantity = 500, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Fortune Soya Oil", category = "Grocery", price = 155.0, unit = "1L", stockQuantity = 150, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Coca-Cola", category = "Beverages", price = 40.0, unit = "750ml", stockQuantity = 100, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Tata Salt", category = "Grocery", price = 25.0, unit = "1kg", stockQuantity = 300, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Red Label Tea", category = "Beverages", price = 145.0, unit = "250g", stockQuantity = 80, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Surf Excel Bar", category = "Household", price = 10.0, unit = "1 unit", stockQuantity = 400, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin")
+                )
+                
+                val batch = firestore.batch()
+                trending.forEach { product ->
+                    val docRef = firestore.collection("products").document()
+                    batch.set(docRef, product.copy(id = docRef.id))
+                }
+                batch.commit().await()
+                _uiEvent.emit(UiEvent.ShowSuccess("10 Trending Products Added to Store"))
+            } catch (e: Exception) {
+                _uiEvent.emit(UiEvent.ShowError("Population Failed: ${e.message}"))
+            }
         }
     }
 
     fun resetAndRepopulateStore() {
         viewModelScope.launch {
-            _uiEvent.emit(UiEvent.ShowSuccess("Store Reset Successful"))
+            try {
+                val snapshot = firestore.collection("products").get().await()
+                val batchDelete = firestore.batch()
+                snapshot.documents.forEach { batchDelete.delete(it.reference) }
+                batchDelete.commit().await()
+                
+                addMarketTrendProducts()
+                _uiEvent.emit(UiEvent.ShowSuccess("Store Reset Successful"))
+            } catch (e: Exception) {
+                _uiEvent.emit(UiEvent.ShowError("Reset Failed: ${e.message}"))
+            }
         }
     }
 
@@ -1411,17 +2059,64 @@ class StoreViewModel @Inject constructor(
     }
 
     fun getCEODashboardStats(): CEODashboardStats {
-        val totalRev = orders.filter { it.status == OrderStatus.DELIVERED }.sumOf { it.totalAmount }
+        val now = System.currentTimeMillis()
+        val calendar = Calendar.getInstance()
+        
+        // Start of Today
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val todayStart = calendar.timeInMillis
+
+        // Yesterday
+        val calendarYesterday = Calendar.getInstance()
+        calendarYesterday.timeInMillis = todayStart
+        calendarYesterday.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterdayStart = calendarYesterday.timeInMillis
+        val yesterdayEnd = todayStart - 1
+
+        // Week (Start of current week)
+        val calendarWeek = Calendar.getInstance()
+        calendarWeek.set(Calendar.DAY_OF_WEEK, calendarWeek.firstDayOfWeek)
+        calendarWeek.set(Calendar.HOUR_OF_DAY, 0)
+        calendarWeek.set(Calendar.MINUTE, 0)
+        calendarWeek.set(Calendar.SECOND, 0)
+        calendarWeek.set(Calendar.MILLISECOND, 0)
+        val weekStart = calendarWeek.timeInMillis
+
+        // Month
+        val calendarMonth = Calendar.getInstance()
+        calendarMonth.set(Calendar.DAY_OF_MONTH, 1)
+        calendarMonth.set(Calendar.HOUR_OF_DAY, 0)
+        calendarMonth.set(Calendar.MINUTE, 0)
+        calendarMonth.set(Calendar.SECOND, 0)
+        calendarMonth.set(Calendar.MILLISECOND, 0)
+        val monthStart = calendarMonth.timeInMillis
+
+        val deliveredOrdersList = orders.filter { it.status == OrderStatus.DELIVERED }
+        
+        val totalRev = deliveredOrdersList.sumOf { it.totalAmount }
+        val totalProfit = deliveredOrdersList.sumOf { it.estimatedProfit }
+        
+        val todayOrders = deliveredOrdersList.filter { it.timestamp >= todayStart }
+        val todayRev = todayOrders.sumOf { it.totalAmount }
+        val todayProfitValue = todayOrders.sumOf { it.estimatedProfit }
+
+        val yesterdayRev = deliveredOrdersList.filter { it.timestamp in yesterdayStart..yesterdayEnd }.sumOf { it.totalAmount }
+        val weeklyRev = deliveredOrdersList.filter { it.timestamp >= weekStart }.sumOf { it.totalAmount }
+        val monthlyRev = deliveredOrdersList.filter { it.timestamp >= monthStart }.sumOf { it.totalAmount }
+
         return CEODashboardStats(
             totalStores = darkStores.size,
             totalUsers = allUsers.size,
             totalRevenueFY = totalRev,
-            totalProfitFY = totalRev * 0.1,
-            todayRevenue = totalRev,
-            todayProfit = totalRev * 0.1,
-            yesterdayRevenue = 0.0,
-            weeklyRevenue = totalRev,
-            monthlyRevenue = totalRev,
+            totalProfitFY = totalProfit,
+            todayRevenue = todayRev,
+            todayProfit = todayProfitValue,
+            yesterdayRevenue = yesterdayRev,
+            weeklyRevenue = weeklyRev,
+            monthlyRevenue = monthlyRev,
             totalOrders = orders.size,
             pendingOrders = orders.count { it.status == OrderStatus.PLACED },
             packedOrders = orders.count { it.status == OrderStatus.READY },
@@ -1464,7 +2159,37 @@ class StoreViewModel @Inject constructor(
     fun importProductsFromJson(uri: Uri) {
         viewModelScope.launch {
             try {
-                _uiEvent.emit(UiEvent.ShowSuccess("JSON Import Started"))
+                val inputStream = getApplication<Application>().contentResolver.openInputStream(uri)
+                val jsonString = inputStream?.bufferedReader()?.use { it.readText() } ?: "[]"
+                val jsonArray = JSONArray(jsonString)
+                
+                val newProducts = mutableListOf<Product>()
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    newProducts.add(Product(
+                        id = UUID.randomUUID().toString(),
+                        name = obj.optString("name", "Unknown Product"),
+                        category = obj.optString("category", "General"),
+                        price = obj.optDouble("price", 0.0),
+                        unit = obj.optString("unit", "1 unit"),
+                        stockQuantity = obj.optInt("stockQuantity", 0),
+                        sellerId = currentUserProfile?.uid ?: "admin",
+                        isVerified = true,
+                        isAvailable = true
+                    ))
+                }
+                
+                if (newProducts.isNotEmpty()) {
+                    val batch = firestore.batch()
+                    newProducts.forEach { p ->
+                        val docRef = firestore.collection("products").document(p.id)
+                        batch.set(docRef, p)
+                    }
+                    batch.commit().await()
+                    _uiEvent.emit(UiEvent.ShowSuccess("Successfully imported ${newProducts.size} products from JSON"))
+                } else {
+                    _uiEvent.emit(UiEvent.ShowError("JSON was empty or invalid"))
+                }
             } catch (e: Exception) {
                 _uiEvent.emit(UiEvent.ShowError("JSON Import Failed: ${e.message}"))
             }
@@ -1525,7 +2250,7 @@ class StoreViewModel @Inject constructor(
                     UserRole.CUSTOMER -> "customers"
                     else -> "sellers"
                 }
-                val updates = mapOf(
+                val updates = mutableMapOf<String, Any?>(
                     "name" to profile.name,
                     "displayName" to profile.name,
                     "fullName" to profile.name,
@@ -1538,7 +2263,32 @@ class StoreViewModel @Inject constructor(
                     "staffDepartment" to profile.staffDepartment,
                     "isActive" to profile.active,
                     "active" to profile.active,
-                    "blockReason" to profile.blockReason
+                    "blockReason" to profile.blockReason,
+                    
+                    // Merchant & Business Details
+                    "tradeName" to profile.tradeName,
+                    "legalName" to profile.legalName,
+                    "businessType" to profile.businessType,
+                    "contactPerson" to profile.contactPerson,
+                    "gstin" to profile.gstin,
+                    "fssaiNumber" to profile.fssaiNumber,
+                    "fssaiExpiryDate" to profile.fssaiExpiryDate,
+                    "panNumber" to profile.panNumber,
+                    "averagePreparationTime" to profile.averagePreparationTime,
+                    
+                    // Bank & UPI Details
+                    "bankName" to profile.bankName,
+                    "bankAccountName" to profile.bankAccountName,
+                    "bankAccountNumber" to profile.bankAccountNumber,
+                    "bankIfscCode" to profile.bankIfscCode,
+                    "upiId" to profile.upiId,
+                    
+                    // Address Details
+                    "storeAddress" to profile.storeAddress,
+                    "city" to profile.city,
+                    "state" to profile.state,
+                    "pincode" to profile.pincode,
+                    "platformFeeDiscount" to profile.platformFeeDiscount
                 )
                 firestore.collection(collection).document(profile.uid).set(updates, com.google.firebase.firestore.SetOptions.merge()).await()
                 if (currentUserProfile?.uid == profile.uid) {
@@ -1630,18 +2380,20 @@ class StoreViewModel @Inject constructor(
     private var chatListener: com.google.firebase.firestore.ListenerRegistration? = null
     private var supportRequestsListener: com.google.firebase.firestore.ListenerRegistration? = null
 
-    fun submitCallRequest() {
-        val profile = currentUserProfile ?: return
+    fun submitCallRequest(guestName: String? = null, guestPhone: String? = null) {
+        val profile = currentUserProfile
+        if (profile == null && guestName == null) return
+        
         viewModelScope.launch {
             try {
                 val id = "CALL_" + UUID.randomUUID().toString().take(8).uppercase()
                 val request = ServiceRequest(
                     id = id,
-                    userId = profile.uid,
-                    userName = profile.name,
-                    userPhone = profile.phoneNumber,
-                    userEmail = profile.email,
-                    userRole = "MERCHANT",
+                    userId = profile?.uid ?: "GUEST_${id.takeLast(4)}",
+                    userName = profile?.name ?: guestName ?: "Guest Merchant",
+                    userPhone = profile?.phoneNumber ?: guestPhone ?: "",
+                    userEmail = profile?.email ?: "",
+                    userRole = if (profile != null) "MERCHANT" else "GUEST_MERCHANT",
                     status = "PENDING",
                     type = "CALLBACK_REQUEST",
                     timestamp = System.currentTimeMillis()
@@ -1666,11 +2418,19 @@ class StoreViewModel @Inject constructor(
             }
     }
 
-    fun startSupportChat() {
-        val profile = currentUserProfile ?: return
+    private var guestChatId: String? = null
+
+    fun startSupportChat(customGuestId: String? = null) {
+        val profile = currentUserProfile
+        val sessionId = profile?.uid ?: customGuestId ?: guestChatId ?: run {
+            val newId = "GUEST_CHAT_${UUID.randomUUID().toString().take(6).uppercase()}"
+            guestChatId = newId
+            newId
+        }
+        
         chatListener?.remove()
         chatListener = firestore.collection("support_chats")
-            .document(profile.uid)
+            .document(sessionId)
             .collection("messages")
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, _ ->
@@ -1681,43 +2441,66 @@ class StoreViewModel @Inject constructor(
         
         // Update session info
         val session = SupportSession(
-            id = profile.uid,
-            userId = profile.uid,
-            userName = profile.name,
-            userEmail = profile.email,
-            userRole = "MERCHANT",
+            id = sessionId,
+            userId = sessionId,
+            userName = profile?.name ?: "Guest Merchant",
+            userEmail = profile?.email ?: "",
+            userRole = if (profile != null) "MERCHANT" else "GUEST_MERCHANT",
             isActive = true
         )
-        firestore.collection("support_chats").document(profile.uid).set(session, com.google.firebase.firestore.SetOptions.merge())
+        firestore.collection("support_chats").document(sessionId).set(session, com.google.firebase.firestore.SetOptions.merge())
     }
 
-    fun sendSupportMessage(text: String) {
-        val profile = currentUserProfile ?: return
+    fun sendSupportMessage(text: String, isAdmin: Boolean = false, targetUserId: String? = null) {
+        val profile = currentUserProfile
+        if (profile == null && !isAdmin && guestChatId == null) return
         if (text.isBlank()) return
+        
+        val sessionId = if (isAdmin && targetUserId != null) targetUserId else (profile?.uid ?: guestChatId!!)
         
         viewModelScope.launch {
             try {
                 val msgId = UUID.randomUUID().toString()
                 val message = SupportMessage(
                     id = msgId,
-                    senderId = profile.uid,
-                    senderName = profile.name,
+                    senderId = profile?.uid ?: guestChatId!!,
+                    senderName = profile?.name ?: "Guest Merchant",
                     message = text,
-                    isFromAdmin = false
+                    isFromAdmin = isAdmin
                 )
                 firestore.collection("support_chats")
-                    .document(profile.uid)
+                    .document(sessionId)
                     .collection("messages")
                     .document(msgId)
                     .set(message)
                 
                 // Update session's last message
-                firestore.collection("support_chats").document(profile.uid).update(
-                    "lastMessage", text,
-                    "lastTimestamp", System.currentTimeMillis(),
-                    "isUnreadByAdmin", true
+                val updates = mutableMapOf<String, Any>(
+                    "lastMessage" to text,
+                    "lastTimestamp" to System.currentTimeMillis()
                 )
+                if (isAdmin) {
+                    updates["isUnreadByUser"] = true
+                } else {
+                    updates["isUnreadByAdmin"] = true
+                }
+                
+                firestore.collection("support_chats").document(sessionId).update(updates)
             } catch (e: Exception) {}
+        }
+    }
+
+    fun assignSupportToAdmin(sessionId: String, adminId: String, adminName: String) {
+        viewModelScope.launch {
+            try {
+                firestore.collection("support_chats").document(sessionId).update(
+                    "assignedAdminId", adminId,
+                    "assignedAdminName", adminName
+                ).await()
+                _uiEvent.emit(UiEvent.ShowSuccess("Chat assigned to $adminName"))
+            } catch (e: Exception) {
+                _uiEvent.emit(UiEvent.ShowError("Assignment failed"))
+            }
         }
     }
 

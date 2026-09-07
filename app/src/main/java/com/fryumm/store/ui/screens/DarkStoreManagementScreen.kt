@@ -1,7 +1,9 @@
 package com.fryumm.store.ui.screens
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -23,7 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,7 +49,9 @@ fun DarkStoreManagementScreen(viewModel: StoreViewModel, onBack: () -> Unit) {
     var isEditing by remember { mutableStateOf(false) }
     var selectedStore by remember { mutableStateOf<DarkStore?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var filterCategory by remember { mutableStateOf("ALL") } // "ALL", "OPERATIONAL", "VACANT"
     var deleteConfirmStore by remember { mutableStateOf<DarkStore?>(null) }
+    var inquiryStore by remember { mutableStateOf<DarkStore?>(null) }
 
     val allMerchants = remember(viewModel.allUsers) {
         viewModel.allUsers.filter { it.userRole == UserRole.MERCHANT || it.userRole == UserRole.STORE_OWNER }
@@ -55,15 +61,24 @@ fun DarkStoreManagementScreen(viewModel: StoreViewModel, onBack: () -> Unit) {
         viewModel.allUsers.filter { it.userRole == UserRole.RIDER }
     }
 
-    val filteredStores = remember(viewModel.darkStores, searchQuery, allMerchants, allRiders) {
-        if (searchQuery.isBlank()) {
-            viewModel.darkStores
-        } else {
-            val q = searchQuery.lowercase().trim()
-            viewModel.darkStores.filter { ds ->
+    val filteredStores = remember(viewModel.darkStores, searchQuery, filterCategory, allMerchants, allRiders) {
+        viewModel.darkStores.filter { ds ->
+            val matchesCategory = when (filterCategory) {
+                "OPERATIONAL" -> ds.isActive && !ds.isFranchiseVacant && ds.franchiseStatus != "VACANT_INVESTMENT_OPEN"
+                "VACANT" -> ds.isFranchiseVacant || ds.franchiseStatus == "VACANT_INVESTMENT_OPEN"
+                else -> true
+            }
+
+            if (!matchesCategory) return@filter false
+
+            if (searchQuery.isBlank()) {
+                true
+            } else {
+                val q = searchQuery.lowercase().trim()
                 ds.name.lowercase().contains(q) ||
                 ds.managerName.lowercase().contains(q) ||
                 ds.address.lowercase().contains(q) ||
+                ds.vacancyReason.lowercase().contains(q) ||
                 allMerchants.any { m ->
                     (m.darkStoreId == ds.id || ds.assignedMerchantIds.contains(m.uid)) &&
                     (m.name.lowercase().contains(q) || m.tradeName.lowercase().contains(q) || m.email.lowercase().contains(q))
@@ -175,8 +190,47 @@ fun DarkStoreManagementScreen(viewModel: StoreViewModel, onBack: () -> Unit) {
                     DarkStoreHeaderBanner(
                         totalHubs = viewModel.darkStores.size,
                         totalAssignedMerchants = allMerchants.count { !it.darkStoreId.isNullOrEmpty() },
-                        totalAssignedRiders = allRiders.count { !it.darkStoreId.isNullOrEmpty() }
+                        totalAssignedRiders = allRiders.count { !it.darkStoreId.isNullOrEmpty() },
+                        totalVacantHubs = viewModel.darkStores.count { it.isFranchiseVacant || it.franchiseStatus == "VACANT_INVESTMENT_OPEN" }
                     )
+                }
+
+                // Filter Category Chips
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = filterCategory == "ALL",
+                            onClick = { filterCategory = "ALL" },
+                            label = { Text("All Hubs (${viewModel.darkStores.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FStorePurple,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                        FilterChip(
+                            selected = filterCategory == "OPERATIONAL",
+                            onClick = { filterCategory = "OPERATIONAL" },
+                            label = { Text("Active Hubs (${viewModel.darkStores.count { it.isActive && !it.isFranchiseVacant }})", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF2E7D32),
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                        FilterChip(
+                            selected = filterCategory == "VACANT",
+                            onClick = { filterCategory = "VACANT" },
+                            label = {
+                                Text("Vacant / Franchise (${viewModel.darkStores.count { it.isFranchiseVacant || it.franchiseStatus == "VACANT_INVESTMENT_OPEN" }})", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFFE65100),
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
                 }
 
                 // Search Bar
@@ -185,7 +239,7 @@ fun DarkStoreManagementScreen(viewModel: StoreViewModel, onBack: () -> Unit) {
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Search Hubs, Managers, Merchants or Riders...", fontSize = 13.sp) },
+                        placeholder = { Text("Search Hubs, Vacancies, Merchants or Riders...", fontSize = 13.sp) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = FStorePurple) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
@@ -236,7 +290,8 @@ fun DarkStoreManagementScreen(viewModel: StoreViewModel, onBack: () -> Unit) {
                                 selectedStore = store
                                 isEditing = true
                             },
-                            onDelete = { deleteConfirmStore = store }
+                            onDelete = { deleteConfirmStore = store },
+                            onInquire = { inquiryStore = it }
                         )
                     }
                 }
@@ -244,6 +299,13 @@ fun DarkStoreManagementScreen(viewModel: StoreViewModel, onBack: () -> Unit) {
                 item { Spacer(Modifier.height(80.dp)) }
             }
         }
+    }
+
+    if (inquiryStore != null) {
+        FranchiseInquiryDialog(
+            store = inquiryStore!!,
+            onDismiss = { inquiryStore = null }
+        )
     }
 
     if (deleteConfirmStore != null) {
@@ -274,7 +336,12 @@ fun DarkStoreManagementScreen(viewModel: StoreViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun DarkStoreHeaderBanner(totalHubs: Int, totalAssignedMerchants: Int, totalAssignedRiders: Int) {
+fun DarkStoreHeaderBanner(
+    totalHubs: Int,
+    totalAssignedMerchants: Int,
+    totalAssignedRiders: Int,
+    totalVacantHubs: Int = 0
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -312,7 +379,7 @@ fun DarkStoreHeaderBanner(totalHubs: Int, totalAssignedMerchants: Int, totalAssi
                             fontSize = 16.sp
                         )
                         Text(
-                            "Merchants & Delivery Partners assigned to dark store hubs",
+                            "Merchants, Delivery Partners & Franchise Vacancies",
                             color = Color.White.copy(alpha = 0.8f),
                             fontSize = 11.sp
                         )
@@ -325,9 +392,10 @@ fun DarkStoreHeaderBanner(totalHubs: Int, totalAssignedMerchants: Int, totalAssi
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    BannerMetricItem(title = "Active Hubs", value = totalHubs.toString())
-                    BannerMetricItem(title = "Linked Merchants", value = totalAssignedMerchants.toString())
-                    BannerMetricItem(title = "Linked Riders", value = totalAssignedRiders.toString())
+                    BannerMetricItem(title = "Total Hubs", value = totalHubs.toString())
+                    BannerMetricItem(title = "Merchants", value = totalAssignedMerchants.toString())
+                    BannerMetricItem(title = "Riders", value = totalAssignedRiders.toString())
+                    BannerMetricItem(title = "Vacancies", value = totalVacantHubs.toString())
                 }
             }
         }
@@ -349,7 +417,8 @@ fun DarkStoreCardFull(
     assignedRiders: List<UserProfile>,
     totalProductsInHub: Int,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onInquire: (DarkStore) -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -360,6 +429,120 @@ fun DarkStoreCardFull(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // FRANCHISE VACANCY PROMINENT BANNER (IF MARKED VACANT)
+            if (store.isFranchiseVacant || store.franchiseStatus == "VACANT_INVESTMENT_OPEN") {
+                Surface(
+                    color = Color(0xFFFFF3E0),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFF9800)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.VolunteerActivism,
+                                    contentDescription = null,
+                                    tint = Color(0xFFE65100),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    "FRANCHISE OPPORTUNITY AVAILABLE",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFFE65100)
+                                )
+                            }
+                            Surface(
+                                color = Color(0xFFE65100),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    "VACANT HUB",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        if (store.vacancyReason.isNotEmpty()) {
+                            Text(
+                                "Category: ${store.vacancyReason}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFBF360C)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (store.investmentAmount.isNotEmpty()) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Est. Investment", fontSize = 9.sp, color = Color.Gray)
+                                    Text(store.investmentAmount, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF33691E))
+                                }
+                            }
+                            if (store.expectedAreaSqFt.isNotEmpty()) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Required Space", fontSize = 9.sp, color = Color.Gray)
+                                    Text(store.expectedAreaSqFt, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A237E))
+                                }
+                            }
+                        }
+
+                        if (store.investmentNotes.isNotEmpty()) {
+                            Text(
+                                store.investmentNotes,
+                                fontSize = 10.sp,
+                                color = Color(0xFF424242),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            OutlinedButton(
+                                onClick = { onInquire(store) },
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, Color(0xFFE65100)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.PhoneInTalk,
+                                    contentDescription = null,
+                                    tint = Color(0xFFE65100),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "INQUIRE / CONTACT FLASHO",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFE65100)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Header Row
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
@@ -730,6 +913,15 @@ fun EditDarkStoreFullScreen(
     var newExLng by remember { mutableStateOf("") }
     var newExRadius by remember { mutableStateOf("500") }
 
+    // Franchise & Investment Vacancy State
+    var isFranchiseVacant by remember { mutableStateOf(store.isFranchiseVacant) }
+    var vacancyReason by remember { mutableStateOf(store.vacancyReason.ifEmpty { "New Area Expansion" }) }
+    var investmentAmount by remember { mutableStateOf(store.investmentAmount) }
+    var expectedAreaSqFt by remember { mutableStateOf(store.expectedAreaSqFt) }
+    var franchiseContactPhone by remember { mutableStateOf(store.franchiseContactPhone) }
+    var franchiseContactEmail by remember { mutableStateOf(store.franchiseContactEmail) }
+    var investmentNotes by remember { mutableStateOf(store.investmentNotes) }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -781,7 +973,15 @@ fun EditDarkStoreFullScreen(
                                 bankIfsc = bankIfsc,
                                 allowedExceptions = exceptions,
                                 assignedMerchantIds = assignedMerchantIds.toList(),
-                                assignedRiderIds = assignedRiderIds.toList()
+                                assignedRiderIds = assignedRiderIds.toList(),
+                                isFranchiseVacant = isFranchiseVacant,
+                                franchiseStatus = if (isFranchiseVacant) "VACANT_INVESTMENT_OPEN" else "OPERATIONAL",
+                                vacancyReason = vacancyReason,
+                                investmentAmount = investmentAmount,
+                                expectedAreaSqFt = expectedAreaSqFt,
+                                franchiseContactPhone = franchiseContactPhone,
+                                franchiseContactEmail = franchiseContactEmail,
+                                investmentNotes = investmentNotes
                             )
                             onSave(updatedStore, assignedMerchantIds.toList(), assignedRiderIds.toList())
                         },
@@ -1455,6 +1655,125 @@ fun EditDarkStoreFullScreen(
                 }
             }
 
+            // 8. FRANCHISE & INVESTMENT OPPORTUNITY (VACANCY SETTINGS)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.VolunteerActivism, contentDescription = null, tint = Color(0xFFE65100), modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("8. FRANCHISE & INVESTMENT OPPORTUNITY (VACANCY)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFFE65100))
+                        }
+
+                        Surface(
+                            color = Color(0xFFFFF3E0),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(0.5.dp, Color(0xFFFFB74D))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Mark Hub as Vacant / Open for Franchise",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFE65100)
+                                    )
+                                    Text(
+                                        "Tick this if Flasho wants to offer a Dark Store franchise at this location for prospective investors.",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFFBF360C)
+                                    )
+                                }
+                                Switch(
+                                    checked = isFranchiseVacant,
+                                    onCheckedChange = { isFranchiseVacant = it },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = Color(0xFFE65100)
+                                    )
+                                )
+                            }
+                        }
+
+                        if (isFranchiseVacant) {
+                            Text("Vacancy Reason / Category:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            val categoryOptions = listOf(
+                                "New Area Expansion",
+                                "Additional Hub (Area Density)",
+                                "Contract Expiring / Re-Allotment",
+                                "Turnkey Investment"
+                            )
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(categoryOptions) { cat ->
+                                    FilterChip(
+                                        selected = vacancyReason == cat,
+                                        onClick = { vacancyReason = cat },
+                                        label = { Text(cat, fontSize = 10.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = Color(0xFFE65100),
+                                            selectedLabelColor = Color.White
+                                        )
+                                    )
+                                }
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = investmentAmount,
+                                    onValueChange = { investmentAmount = it },
+                                    label = { Text("Est. Investment Amount") },
+                                    placeholder = { Text("e.g. ₹5,00,000 - ₹10,00,000") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = expectedAreaSqFt,
+                                    onValueChange = { expectedAreaSqFt = it },
+                                    label = { Text("Space Required (Sq. Ft.)") },
+                                    placeholder = { Text("e.g. 500 - 1000 Sq. Ft.") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = franchiseContactPhone,
+                                    onValueChange = { franchiseContactPhone = it },
+                                    label = { Text("Franchise Contact Phone") },
+                                    placeholder = { Text("+91 9876543210") },
+                                    modifier = Modifier.weight(1f),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                                )
+                                OutlinedTextField(
+                                    value = franchiseContactEmail,
+                                    onValueChange = { franchiseContactEmail = it },
+                                    label = { Text("Franchise Contact Email") },
+                                    placeholder = { Text("franchise@flasho.in") },
+                                    modifier = Modifier.weight(1f),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = investmentNotes,
+                                onValueChange = { investmentNotes = it },
+                                label = { Text("Investment Highlights & Notes for Investors") },
+                                placeholder = { Text("e.g. High order density location. Flasho provides tech, inventory support & delivery fleet.") },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                                maxLines = 4
+                            )
+                        }
+                    }
+                }
+            }
+
             // SAVE BUTTON AT BOTTOM
             item {
                 Button(
@@ -1475,7 +1794,15 @@ fun EditDarkStoreFullScreen(
                             bankIfsc = bankIfsc,
                             allowedExceptions = exceptions,
                             assignedMerchantIds = assignedMerchantIds.toList(),
-                            assignedRiderIds = assignedRiderIds.toList()
+                            assignedRiderIds = assignedRiderIds.toList(),
+                            isFranchiseVacant = isFranchiseVacant,
+                            franchiseStatus = if (isFranchiseVacant) "VACANT_INVESTMENT_OPEN" else "OPERATIONAL",
+                            vacancyReason = vacancyReason,
+                            investmentAmount = investmentAmount,
+                            expectedAreaSqFt = expectedAreaSqFt,
+                            franchiseContactPhone = franchiseContactPhone,
+                            franchiseContactEmail = franchiseContactEmail,
+                            investmentNotes = investmentNotes
                         )
                         onSave(updatedStore, assignedMerchantIds.toList(), assignedRiderIds.toList())
                     },
@@ -1494,4 +1821,110 @@ fun EditDarkStoreFullScreen(
             item { Spacer(Modifier.height(40.dp)) }
         }
     }
+}
+
+@Composable
+fun FranchiseInquiryDialog(
+    store: DarkStore,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    var copiedNotice by remember { mutableStateOf(false) }
+
+    val contactPhone = store.franchiseContactPhone.ifEmpty { "+91 9876543210" }
+    val contactEmail = store.franchiseContactEmail.ifEmpty { "franchise@flasho.in" }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(Icons.Default.VolunteerActivism, contentDescription = null, tint = Color(0xFFE65100), modifier = Modifier.size(32.dp))
+        },
+        title = {
+            Text(
+                "Franchise Investment Details",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = Color(0xFFE65100)
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Fulfillment Hub: ${store.name.ifEmpty { "Flasho Dark Store" }}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+                if (store.address.isNotEmpty()) {
+                    Text("Location: ${store.address}", fontSize = 11.sp, color = Color.Gray)
+                }
+
+                HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray)
+
+                if (store.vacancyReason.isNotEmpty()) {
+                    Text("Vacancy Category: ${store.vacancyReason}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFBF360C))
+                }
+
+                if (store.investmentAmount.isNotEmpty()) {
+                    Text("Estimated Investment: ${store.investmentAmount}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF33691E))
+                }
+
+                if (store.expectedAreaSqFt.isNotEmpty()) {
+                    Text("Required Space: ${store.expectedAreaSqFt}", fontSize = 11.sp, color = Color.DarkGray)
+                }
+
+                if (store.investmentNotes.isNotEmpty()) {
+                    Text("Highlights: ${store.investmentNotes}", fontSize = 11.sp, color = Color.DarkGray)
+                }
+
+                HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray)
+
+                Text("Contact Flasho Franchise Team:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = FStorePurple)
+                Text("📞 Mobile: $contactPhone", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("✉️ Email: $contactEmail", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+
+                if (copiedNotice) {
+                    Text("✅ Contact details copied to clipboard!", fontSize = 10.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$contactPhone"))
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Call Now", fontSize = 11.sp)
+                    }
+
+                    Button(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString("Flasho Dark Store Franchise Inquiry: ${store.name}\nPhone: $contactPhone\nEmail: $contactEmail"))
+                            copiedNotice = true
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = FStorePurple),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Copy Info", fontSize = 11.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }

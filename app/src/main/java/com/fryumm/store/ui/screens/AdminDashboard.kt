@@ -185,6 +185,16 @@ fun AdminDashboard(viewModel: StoreViewModel, navController: NavHostController) 
         }
 
         item {
+            val lowStockCount = viewModel.lowStockProducts.size
+            AdminQuickAction(
+                "Inventory Alerts",
+                if (lowStockCount > 0) "$lowStockCount items are low on stock!" else "All stores are well-stocked",
+                if (lowStockCount > 0) Icons.Default.Warning else Icons.Default.Inventory,
+                onClick = { navController.navigate("inventory_alerts") }
+            )
+        }
+
+        item {
             AdminQuickAction(
                 "Store Network",
                 "Manage Dark Store Hubs & Radius",

@@ -44,6 +44,7 @@ export function loadAllComponents() {
 
     componentsLoadPromise = Promise.all([
         // Layout & Overlays
+        loadComponent('login-overlay-container', 'components/login-overlay.html'),
         loadComponent('header-container', 'components/header.html'),
         loadComponent('sidebar-container', 'components/sidebar.html'),
 
@@ -51,7 +52,6 @@ export function loadAllComponents() {
         loadComponent('tab-overview', 'components/tabs/overview.html'),
         loadComponent('tab-merchant-home', 'components/tabs/merchant-home.html'),
         loadComponent('tab-user-profile', 'components/tabs/user-profile.html'),
-        loadComponent('tab-app-control', 'components/tabs/app-control.html'),
         loadComponent('tab-products', 'components/tabs/products.html'),
         loadComponent('tab-orders', 'components/tabs/orders.html'),
         loadComponent('tab-dark-stores', 'components/tabs/dark-stores.html'),
@@ -63,7 +63,6 @@ export function loadAllComponents() {
         loadComponent('tab-settings', 'components/tabs/settings.html'),
 
         // Modals
-        loadComponent('modal-banner-container', 'components/modals/banner-modal.html'),
         loadComponent('modal-product-container', 'components/modals/product-modal.html'),
         loadComponent('modal-dark-store-container', 'components/modals/dark-store-modal.html'),
         loadComponent('modal-coupon-container', 'components/modals/coupon-modal.html'),

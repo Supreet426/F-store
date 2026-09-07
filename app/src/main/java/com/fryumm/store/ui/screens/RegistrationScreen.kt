@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -12,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.PhoneCallback
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,9 +41,23 @@ fun RegistrationScreen(
     onGoogleLogin: () -> Unit
 ) {
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
     var selectedCategory by remember { mutableStateOf("") }
     var showChat by remember { mutableStateOf(false) }
     var showCallbackDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        storeViewModel.uiEvent.collect { event ->
+            when (event) {
+                is StoreViewModel.UiEvent.ShowSuccess -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+                is StoreViewModel.UiEvent.ShowError -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+            }
+        }
+    }
 
     if (showChat) {
         SupportChatScreen(
@@ -96,6 +112,7 @@ fun RegistrationScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Join Flash-O Partner Network", fontWeight = FontWeight.Black, fontSize = 18.sp) },
@@ -132,8 +149,8 @@ fun RegistrationScreen(
             )
 
             RegistrationCategoryCard(
-                title = "Sell on Flash-O (0% MDR)",
-                description = "List your store products and get orders from nearby customers with zero commission fees.",
+                title = "Sell on Flash-O",
+                description = "List your store products and get orders from nearby customers with professional logistics.",
                 icon = Icons.Default.Storefront,
                 isSelected = selectedCategory == "SELL_ON_FLASHO",
                 onClick = { selectedCategory = "SELL_ON_FLASHO" }
@@ -143,7 +160,7 @@ fun RegistrationScreen(
 
             RegistrationCategoryCard(
                 title = "Supply to Dark Stores",
-                description = "Become a bulk supplier for Flash-O Dark Stores and Fulfillment Hubs in your city.",
+                description = "Join ${storeViewModel.darkStores.size} active fulfillment hubs in your city as a bulk supplier.",
                 icon = Icons.Default.Inventory,
                 isSelected = selectedCategory == "SUPPLY_TO_DARK_STORES",
                 onClick = { selectedCategory = "SUPPLY_TO_DARK_STORES" }
@@ -209,7 +226,7 @@ fun RegistrationScreen(
                 )
                 RegistrationSupportButton(
                     label = "Request Call",
-                    icon = Icons.Default.PhoneCallback,
+                    icon = Icons.AutoMirrored.Filled.PhoneCallback,
                     color = Color(0xFFFF9800),
                     onClick = { showCallbackDialog = true }
                 )

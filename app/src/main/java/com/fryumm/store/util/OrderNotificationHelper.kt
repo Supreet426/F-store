@@ -6,10 +6,7 @@ import com.fryumm.store.data.model.UserRole
 
 object OrderNotificationHelper {
 
-    val MASTER_ADMIN_EMAILS = listOf(
-        "ranjanamishra1117@gmail.com",
-        "supreet.mishr@gmail.com"
-    )
+    val MASTER_ADMIN_EMAILS = MasterAdminSecurity.MASTER_ADMIN_EMAILS
 
     /**
      * Business & Security Logic:

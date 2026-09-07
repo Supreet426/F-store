@@ -100,6 +100,7 @@ fun LoginScreen(
     authError: String? = null,
     authSuccess: String? = null,
     onGoogleLogin: () -> Unit,
+    onRegister: () -> Unit,
     onContactSupport: () -> Unit = {},
     onClearError: () -> Unit = {}
 ) {
@@ -135,6 +136,24 @@ fun LoginScreen(
                     contentDescription = "F-Store",
                     tint = Color.White,
                     modifier = Modifier.size(44.dp)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Button(
+                onClick = onRegister,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = FStorePurple)
+            ) {
+                Text(
+                    text = "Join as a Partner",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
                 )
             }
 
@@ -296,6 +315,24 @@ fun LoginScreen(
                         )
                     }
                 }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Button(
+                onClick = onRegister,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = FStorePurple)
+            ) {
+                Text(
+                    text = "Join as a Partner",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
             }
 
             Spacer(Modifier.height(24.dp))

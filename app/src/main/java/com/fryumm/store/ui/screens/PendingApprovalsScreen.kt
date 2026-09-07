@@ -27,6 +27,7 @@ import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.fryumm.store.data.model.*
+import com.fryumm.store.ui.components.ProductDetailDialog
 import com.fryumm.store.ui.screens.profiles.MerchantProfilePage
 import com.fryumm.store.ui.theme.FStorePurple
 import com.fryumm.store.ui.viewmodels.StoreViewModel
@@ -258,6 +259,7 @@ fun PendingApprovalsScreen(
                             items(pendingProducts, key = { it.id }) { product ->
                                 PendingProductCard(
                                     product = product,
+                                    viewModel = viewModel,
                                     onApprove = { selectedProductForApproval = product },
                                     onEdit = { navController.navigate("edit_product/${product.id}") }
                                 )
@@ -390,12 +392,29 @@ fun EmptyStateCard(title: String, description: String) {
 @Composable
 fun PendingProductCard(
     product: Product,
+    viewModel: StoreViewModel,
     onApprove: () -> Unit,
     onEdit: () -> Unit
 ) {
     val context = LocalContext.current
+    var showDetailDialog by remember { mutableStateOf(false) }
+
+    if (showDetailDialog) {
+        ProductDetailDialog(
+            product = product,
+            viewModel = viewModel,
+            onDismiss = { showDetailDialog = false },
+            onEdit = {
+                showDetailDialog = false
+                onEdit()
+            }
+        )
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showDetailDialog = true },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)

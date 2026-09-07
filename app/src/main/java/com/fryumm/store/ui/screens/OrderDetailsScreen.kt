@@ -2,6 +2,7 @@ package com.fryumm.store.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.location.Location
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -21,7 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fryumm.store.ui.viewmodels.StoreViewModel
+import com.fryumm.store.data.model.Order
 import com.fryumm.store.data.model.OrderStatus
+import com.fryumm.store.data.model.UserProfile
+import com.fryumm.store.data.model.StoreConfig
 import com.fryumm.store.ui.components.StatusBadge
 import com.fryumm.store.ui.components.PaymentStatusBadge
 import com.fryumm.store.ui.theme.FStorePurple
@@ -91,6 +95,15 @@ fun OrderDetailsScreen(
                         }
                     }
                 }
+            }
+
+            // Rider Tracking Section
+            item {
+                RiderTrackingSection(
+                    order = order,
+                    riderProfile = viewModel.allUsers.find { it.uid == order.deliveryAgentId },
+                    storeConfig = viewModel.storeConfig
+                )
             }
 
             // Customer Details
@@ -278,5 +291,77 @@ private fun InfoRow(label: String, value: String) {
     ) {
         Text(label, fontSize = 13.sp, color = Color.Gray, modifier = Modifier.width(110.dp))
         Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+fun RiderTrackingSection(
+    order: Order,
+    riderProfile: UserProfile?,
+    storeConfig: StoreConfig
+) {
+    if (order.status !in listOf(OrderStatus.ASSIGNED, OrderStatus.DISPATCHED, OrderStatus.READY, OrderStatus.PICKED)) return
+    if (riderProfile == null || riderProfile.latitude == null || riderProfile.longitude == null) return
+
+    val riderLat = riderProfile.latitude!!
+    val riderLng = riderProfile.longitude!!
+
+    val (targetLat, targetLng, targetLabel) = if (order.status == OrderStatus.DISPATCHED) {
+        Triple(order.liveLat ?: 0.0, order.liveLng ?: 0.0, "Customer")
+    } else {
+        Triple(order.sellerLatitude ?: storeConfig.storeLatitude, order.sellerLongitude ?: storeConfig.storeLongitude, "Store")
+    }
+
+    if (targetLat == 0.0) return
+
+    val results = FloatArray(1)
+    Location.distanceBetween(riderLat, riderLng, targetLat, targetLng, results)
+    val distanceMeters = results[0].toInt()
+    
+    val etaMinutes = if (distanceMeters < 100) 1 else (distanceMeters / 400) + 2
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+        border = BorderStroke(1.dp, Color(0xFFC8E6C9))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Moped, null, tint = Color(0xFF2E7D32), modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Live Rider Tracking", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF2E7D32))
+                }
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "ETA: $etaMinutes MIN",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = Color(0xFF2E7D32)
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "Rider is ${distanceMeters}m away from $targetLabel",
+                fontSize = 13.sp,
+                color = Color.DarkGray
+            )
+            LinearProgressIndicator(
+                progress = { 0.5f },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(6.dp),
+                color = Color(0xFF4CAF50),
+                trackColor = Color(0xFFA5D6A7).copy(alpha = 0.3f)
+            )
+        }
     }
 }

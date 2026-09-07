@@ -34,13 +34,15 @@ class AuthViewModel @Inject constructor(
         data class ShowSuccess(val message: String) : UiEvent()
     }
 
-    val masterAdmins = listOf("ranjanamishra1117@gmail.com", "supreet.mishr@gmail.com")
+    val masterAdmins = com.fryumm.store.util.MasterAdminSecurity.MASTER_ADMIN_EMAILS
 
     var currentUserProfile by mutableStateOf<UserProfile?>(null)
         private set
 
+    var pendingBusinessType by mutableStateOf("")
+
     val isMasterAdmin: Boolean
-        get() = currentUserProfile?.email?.lowercase()?.trim() in masterAdmins
+        get() = com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(currentUserProfile?.email)
 
     var isAuthLoading by mutableStateOf(true)
         private set
@@ -99,8 +101,10 @@ class AuthViewModel @Inject constructor(
                         email = currentUser.email ?: "", 
                         name = displayName, 
                         photoUrl = currentUser.photoUrl?.toString() ?: "",
-                        role = if (currentUser.email?.lowercase() in masterAdmins) "ADMIN" else "STORE_OWNER"
+                        role = if (currentUser.email?.lowercase() in masterAdmins) "ADMIN" else "STORE_OWNER",
+                        businessType = pendingBusinessType
                     )
+                    pendingBusinessType = ""
                     try {
                         val targetCollection = if (newProfile.role == "ADMIN") "users" else "sellers"
                         firestore.collection(targetCollection).document(currentUser.uid).set(newProfile).await()
@@ -111,6 +115,33 @@ class AuthViewModel @Inject constructor(
                 }
                 
                 currentUserProfile?.let { profile ->
+                    if (com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(profile.email)) {
+                        val context = getApplication<Application>().applicationContext
+                        val activeDeviceId = com.fryumm.store.util.MasterAdminSecurity.getDeviceId(context)
+                        val verification = com.fryumm.store.util.MasterAdminSecurity.verifyAdminSession(
+                            context = context,
+                            profile = profile,
+                            currentEmail = currentUser.email ?: profile.email,
+                            currentPhone = profile.phoneNumber,
+                            currentDeviceId = activeDeviceId
+                        )
+                        if (!verification.isVerified) {
+                            auth.signOut()
+                            currentUserProfile = null
+                            _uiEvent.emit(UiEvent.ShowError(verification.message))
+                            isAuthLoading = false
+                            return@launch
+                        }
+                        if (profile.deviceId.isBlank() && activeDeviceId.isNotBlank()) {
+                            try {
+                                firestore.collection("users").document(profile.uid).update("deviceId", activeDeviceId).await()
+                                currentUserProfile = profile.copy(deviceId = activeDeviceId)
+                            } catch (e: Exception) {
+                                Log.e("AuthViewModel", "Failed to update admin deviceId", e)
+                            }
+                        }
+                    }
+
                     if (profile.uid.isNotEmpty()) {
                         val tokenRole = when(profile.userRole) {
                             UserRole.ADMIN -> "admin"
@@ -171,7 +202,13 @@ class AuthViewModel @Inject constructor(
                                 .whereEqualTo("name", cleanInput)
                                 .limit(1).get().await()
                             if (!byName.isEmpty) {
-                                resolvedEmail = byName.documents[0].getString("email")
+                                val foundEmail = byName.documents[0].getString("email")
+                                if (com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(foundEmail)) {
+                                    _uiEvent.emit(UiEvent.ShowError("SECURITY PROTECTION: Master Admins must log in using their exact registered Email address only."))
+                                    isAuthLoading = false
+                                    return@launch
+                                }
+                                resolvedEmail = foundEmail
                                 if (!resolvedEmail.isNullOrBlank()) break
                             }
                         } catch (e: Exception) {
@@ -260,16 +297,36 @@ class AuthViewModel @Inject constructor(
                 val duplicateFlags = mutableListOf<String>()
 
                 if (roleStr == "CUSTOMER") {
-                    // FLEXIBLE CUSTOMER REGISTRATION POLICY:
-                    // Registration is NEVER blocked for customers (users change phones, share devices, forget emails).
-                    // Instead, if duplicate Device ID, Mobile, or Email is detected, we log an Admin Fraud Alert
-                    // and freeze Referral Rewards pending Staff verification, while allowing normal orders without friction.
+                    // Check if a customer account with this mobile number already exists
                     val existingPhone1 = firestore.collection("customers").whereEqualTo("phoneNumber", cleanPhone).get().await()
                     val existingPhone2 = firestore.collection("customers").whereEqualTo("mobile", cleanPhone).get().await()
+                    val existingCustomerDoc = existingPhone1.documents.firstOrNull() ?: existingPhone2.documents.firstOrNull()
+
+                    if (existingCustomerDoc != null) {
+                        // AUTO-REDIRECT / LOGIN TO EXISTING CUSTOMER ACCOUNT:
+                        // Mobile number already exists in customers collection!
+                        // Instead of blocking registration or creating a duplicate account/UID, auto-login to existing account.
+                        val existingEmail = existingCustomerDoc.getString("email")?.takeIf { it.isNotBlank() } ?: cleanEmail
+                        try {
+                            if (existingEmail.isNotEmpty()) {
+                                auth.signInWithEmailAndPassword(existingEmail, pass).await()
+                                setupSession(onSuccess)
+                                _uiEvent.emit(UiEvent.ShowSuccess("Existing account found for Mobile $cleanPhone. Logged in successfully!"))
+                                return@launch
+                            }
+                        } catch (loginEx: Exception) {
+                            Log.e("AuthViewModel", "Auto-login to existing customer failed for mobile $cleanPhone", loginEx)
+                            _uiEvent.emit(
+                                UiEvent.ShowError("An account with Mobile $cleanPhone already exists ($existingEmail). Please check your password or log in.")
+                            )
+                            isAuthLoading = false
+                            return@launch
+                        }
+                    }
+
                     val existingEmail = if (cleanEmail.isNotEmpty()) firestore.collection("customers").whereEqualTo("email", cleanEmail).get().await() else null
                     val existingDevice = if (cleanDeviceId.isNotEmpty()) firestore.collection("customers").whereEqualTo("deviceId", cleanDeviceId).get().await() else null
 
-                    if (!existingPhone1.isEmpty || !existingPhone2.isEmpty) duplicateFlags.add("SHARED_MOBILE")
                     if (existingEmail != null && !existingEmail.isEmpty) duplicateFlags.add("SHARED_EMAIL")
                     if (existingDevice != null && !existingDevice.isEmpty) duplicateFlags.add("SHARED_DEVICE_ID")
 

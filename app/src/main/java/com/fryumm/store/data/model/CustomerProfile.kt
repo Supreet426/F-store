@@ -1,5 +1,14 @@
 package com.fryumm.store.data.model
 
+data class AddressItem(
+    val id: String = "",
+    val label: String = "Home", // Home, Work, Other
+    val addressLine: String = "",
+    val landmark: String = "",
+    val pincode: String = "",
+    val isDefault: Boolean = false
+)
+
 data class CustomerProfile(
     val id: String = "",
     val name: String = "",
@@ -45,5 +54,17 @@ data class CustomerProfile(
     val isTrialEligible: Boolean = true, // New: True for new users, false after first order activation
     val subscriptionTier: String? = null, // "basic_99" or "premium_199"
     val subscriptionExpiry: Long? = null,
-    val subscriptionStartDate: Long? = null
+    val subscriptionStartDate: Long? = null,
+
+    // Advanced Quick-Commerce Profile Fields
+    val savedAddresses: List<AddressItem> = emptyList(),
+    val defaultDeliveryInstructions: String = "", // e.g. "Leave at door", "Don't ring bell"
+    val totalRefundsCount: Int = 0,
+    val totalRefundedAmount: Double = 0.0,
+    val openSupportTicketsCount: Int = 0,
+    val cartAbandonedItemsCount: Int = 0,
+    val cartAbandonedTotalValue: Double = 0.0,
+    val pushNotificationEnabled: Boolean = true,
+    val whatsappUpdatesOptIn: Boolean = true,
+    val avgCustomerRating: Double = 5.0
 )

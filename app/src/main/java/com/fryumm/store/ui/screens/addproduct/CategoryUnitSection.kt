@@ -19,6 +19,8 @@ import com.fryumm.store.ui.theme.FStorePurple
 fun CategoryUnitSection(
     category: String,
     onCategoryClick: () -> Unit,
+    onCategoryChange: (String) -> Unit = {},
+    isCategoryEditable: Boolean = false,
     unitType: String,
     onUnitTypeChange: (String) -> Unit,
     measurementUnit: String,
@@ -33,31 +35,35 @@ fun CategoryUnitSection(
 
             OutlinedTextField(
                 value = category,
-                onValueChange = { },
-                label = { Text("Category Name") },
+                onValueChange = { if (isCategoryEditable) onCategoryChange(it) },
+                label = { Text(if (isCategoryEditable) "Enter Custom Category" else "Category Name") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onCategoryClick() },
+                    .let { if (!isCategoryEditable) it.clickable { onCategoryClick() } else it },
                 shape = RoundedCornerShape(12.dp),
-                placeholder = { Text("Select category...") },
-                readOnly = true,
-                enabled = false,
+                placeholder = { Text(if (isCategoryEditable) "e.g. Handmade Crafts" else "Select category...") },
+                readOnly = !isCategoryEditable,
+                enabled = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    disabledTextColor = Color.Black,
-                    disabledBorderColor = Color.Gray,
-                    disabledLabelColor = FStorePurple,
-                    disabledPlaceholderColor = Color.Gray,
-                    disabledTrailingIconColor = FStorePurple
+                    focusedBorderColor = FStorePurple,
+                    unfocusedBorderColor = Color.Gray,
+                    focusedLabelColor = FStorePurple,
+                    unfocusedLabelColor = Color.Gray
                 ),
                 trailingIcon = {
-                    Icon(Icons.Default.KeyboardArrowDown, null, tint = FStorePurple)
+                    if (!isCategoryEditable) {
+                        IconButton(onClick = onCategoryClick) {
+                            Icon(Icons.Default.KeyboardArrowDown, null, tint = FStorePurple)
+                        }
+                    }
                 }
             )
 
             Text(
-                "Tap to choose from existing categories or create new one.",
+                if (isCategoryEditable) "Type your custom category above." 
+                else "Tap to choose from existing categories or create new one.",
                 fontSize = 10.sp,
-                color = Color.Gray,
+                color = if (isCategoryEditable) FStorePurple else Color.Gray,
                 modifier = Modifier.padding(top = 4.dp, start = 4.dp)
             )
         }

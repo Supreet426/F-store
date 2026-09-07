@@ -7,6 +7,8 @@ import {
     createNewUserAccountInDb,
     updateUserAccountInDb
 } from './user-service.js';
+import { db } from './firebase-config.js';
+import { doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { escapeHtml, exportToCsv } from './utils.js';
 
 let activeRoleFilter = "ALL";
@@ -42,7 +44,7 @@ export function initUserUI() {
         formProfile.addEventListener("submit", handleFullProfileFormSubmit);
     }
 
-    // Modal edit form submit (kept for safety but not used in primary flow)
+    // Modal edit form submit
     const formEdit = document.getElementById("form-edit-user");
     if (formEdit) {
         formEdit.addEventListener("submit", handleEditUserFormSubmit);
@@ -189,6 +191,34 @@ function getRoleBadgeHTML(role) {
     }
 }
 
+/* DIRECT COMMUNICATION ACTION SHORTCUTS */
+
+window.contactUserViaPhone = function() {
+    if (!currentlyEditingUser || !currentlyEditingUser.phone || currentlyEditingUser.phone === 'N/A') {
+        if (window.showToast) window.showToast("No mobile number available for this account", "error");
+        return;
+    }
+    window.open(`tel:${currentlyEditingUser.phone}`, '_self');
+};
+
+window.contactUserViaWhatsApp = function() {
+    if (!currentlyEditingUser || !currentlyEditingUser.phone || currentlyEditingUser.phone === 'N/A') {
+        if (window.showToast) window.showToast("No mobile number available for this account", "error");
+        return;
+    }
+    const cleanPhone = String(currentlyEditingUser.phone).replace(/[^0-9]/g, '');
+    const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}`, '_blank');
+};
+
+window.contactUserViaEmail = function() {
+    if (!currentlyEditingUser || !currentlyEditingUser.email) {
+        if (window.showToast) window.showToast("No email address available for this account", "error");
+        return;
+    }
+    window.open(`mailto:${currentlyEditingUser.email}`, '_self');
+};
+
 /* GLOBAL WINDOW HANDLERS FOR HTML EVENT BINDING */
 
 window.openUserProfile = function(uid, colName) {
@@ -289,9 +319,278 @@ window.openUserProfile = function(uid, colName) {
     const freezeBtnText = document.getElementById("lbl-profile-freeze");
     if (freezeBtnText) freezeBtnText.textContent = user.isActive ? "Freeze" : "Reactivate";
 
+    // Admin Internal Notes Textarea
+    const adminNotesInput = document.getElementById("fp-admin-notes");
+    if (adminNotesInput) adminNotesInput.value = user.blockReason || user.adminNotes || "";
+
+    // Toggle Role Sections Visibility
+    const isMerchant = user.role === "MERCHANT" || user.role === "STORE_OWNER";
+    const isCustomer = user.role === "CUSTOMER";
+
+    const merchWrap = document.getElementById("merchant-details-wrap");
+    if (merchWrap) merchWrap.style.display = isMerchant ? "block" : "none";
+
+    const custWrap = document.getElementById("customer-details-wrap");
+    if (custWrap) custWrap.style.display = isCustomer ? "block" : "none";
+
+    // Populate Merchant Details
+    if (isMerchant) {
+        const now = Date.now();
+        const isVacation = user.vacationStart && user.vacationEnd && now >= user.vacationStart && now <= user.vacationEnd;
+        const statusPill = document.getElementById("merchant-store-status-pill");
+        if (statusPill) {
+            if (!user.isActive) {
+                statusPill.innerHTML = `<span class="badge bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs px-3 py-1 font-bold"><i class="fa-solid fa-ban mr-1"></i> STORE BLOCKED</span>`;
+            } else if (isVacation) {
+                statusPill.innerHTML = `<span class="badge bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-3 py-1 font-bold"><i class="fa-solid fa-umbrella-beach mr-1"></i> ON VACATION</span>`;
+            } else {
+                statusPill.innerHTML = `<span class="badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1 font-bold"><i class="fa-solid fa-circle-check mr-1"></i> OPEN / LIVE</span>`;
+            }
+        }
+
+        const prepTime = document.getElementById("m-prep-time");
+        if (prepTime) prepTime.textContent = `${user.averagePreparationTime || 15} Mins`;
+
+        const darkstore = document.getElementById("m-darkstore-hub");
+        if (darkstore) darkstore.textContent = user.darkStoreId || user.darkStoreArea || "Central Main Hub";
+
+        const vacWin = document.getElementById("m-vacation-window");
+        if (vacWin) {
+            if (user.vacationStart && user.vacationEnd) {
+                const s = new Date(user.vacationStart).toLocaleDateString();
+                const e = new Date(user.vacationEnd).toLocaleDateString();
+                vacWin.textContent = `${s} - ${e}`;
+            } else {
+                vacWin.textContent = "None Scheduled";
+            }
+        }
+
+        const tradeName = document.getElementById("m-trade-name");
+        if (tradeName) tradeName.textContent = user.tradeName || user.name || "N/A";
+
+        const legalName = document.getElementById("m-legal-name");
+        if (legalName) legalName.textContent = user.legalName || "N/A";
+
+        const bizType = document.getElementById("m-biz-type");
+        if (bizType) bizType.textContent = user.businessType || "Retail Merchant";
+
+        const gstin = document.getElementById("m-gstin");
+        if (gstin) gstin.textContent = user.gstin || "N/A";
+
+        const fssai = document.getElementById("m-fssai");
+        if (fssai) fssai.textContent = user.fssaiNumber || "N/A";
+
+        const pan = document.getElementById("m-pan");
+        if (pan) pan.textContent = user.panNumber || "N/A";
+
+        const bankName = document.getElementById("m-bank-name");
+        if (bankName) bankName.textContent = user.bankName || "N/A";
+
+        const bankHolder = document.getElementById("m-bank-holder");
+        if (bankHolder) bankHolder.textContent = user.bankAccountName || "N/A";
+
+        const bankAcc = document.getElementById("m-bank-acc");
+        if (bankAcc) bankAcc.textContent = user.bankAccountNumber || "N/A";
+
+        const bankIfsc = document.getElementById("m-bank-ifsc");
+        if (bankIfsc) bankIfsc.textContent = user.bankIfscCode || "N/A";
+
+        const storeAddress = document.getElementById("m-store-address");
+        if (storeAddress) storeAddress.textContent = user.storeAddress || user.address || "N/A";
+
+        const coinsVal = document.getElementById("m-coins-val");
+        if (coinsVal) coinsVal.textContent = user.flashOCoins || 0;
+
+        const feeDiscountInput = document.getElementById("m-platform-discount-input");
+        if (feeDiscountInput) feeDiscountInput.value = user.platformFeeDiscount !== undefined ? user.platformFeeDiscount : 0;
+
+        const refCode = document.getElementById("m-ref-code");
+        if (refCode) refCode.textContent = user.merchantReferralCode || "N/A";
+
+        const refCount = document.getElementById("m-ref-count");
+        if (refCount) refCount.textContent = `${user.referralCount || 0} Leads`;
+    }
+
+    // Populate Customer Details
+    if (isCustomer) {
+        const now = Date.now();
+        const lastOrderTs = user.lastOrderDate || user.lastLogin;
+        const daysSinceLastOrder = lastOrderTs ? Math.floor((now - lastOrderTs) / (1000 * 60 * 60 * 24)) : null;
+
+        const churnBadge = document.getElementById("customer-churn-badge");
+        if (churnBadge) {
+            if (daysSinceLastOrder === null) {
+                churnBadge.innerHTML = `<span class="badge bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs px-3 py-1 font-bold"><i class="fa-solid fa-user-plus mr-1"></i> NEW USER (NO ORDERS)</span>`;
+            } else if (daysSinceLastOrder <= 1) {
+                churnBadge.innerHTML = `<span class="badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1 font-bold"><i class="fa-solid fa-bolt mr-1"></i> ACTIVE TODAY</span>`;
+            } else if (daysSinceLastOrder <= 7) {
+                churnBadge.innerHTML = `<span class="badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1 font-bold"><i class="fa-solid fa-check mr-1"></i> ACTIVE THIS WEEK</span>`;
+            } else if (daysSinceLastOrder <= 30) {
+                churnBadge.innerHTML = `<span class="badge bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-3 py-1 font-bold"><i class="fa-solid fa-clock-rotate-left mr-1"></i> REGULAR ACTIVE (${daysSinceLastOrder} DAYS AGO)</span>`;
+            } else {
+                churnBadge.innerHTML = `<span class="badge bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs px-3 py-1 font-bold animate-pulse"><i class="fa-solid fa-triangle-exclamation mr-1"></i> AT CHURN RISK (${daysSinceLastOrder} DAYS INACTIVE)</span>`;
+            }
+        }
+
+        const lifetimeSpend = document.getElementById("c-lifetime-spend");
+        if (lifetimeSpend) lifetimeSpend.textContent = `₹${user.lifetimeSpending || 0}`;
+
+        const walletBal = document.getElementById("c-wallet-balance");
+        if (walletBal) walletBal.textContent = `₹${user.walletBalance || 0}`;
+
+        const passTitle = document.getElementById("c-pass-title");
+        const passDesc = document.getElementById("c-pass-desc");
+        if (passTitle && passDesc) {
+            if (user.isSubscribed && user.subscriptionExpiry) {
+                const isExpired = user.subscriptionExpiry < Date.now();
+                if (isExpired) {
+                    passTitle.textContent = "PASS EXPIRED";
+                    passTitle.className = "font-bold text-sm text-rose-400";
+                    passDesc.textContent = `Expired on ${new Date(user.subscriptionExpiry).toLocaleDateString()}`;
+                } else {
+                    passTitle.textContent = `ACTIVE PASS: ${String(user.subscriptionTier || 'VIP').toUpperCase()}`;
+                    passTitle.className = "font-bold text-sm text-purple-400";
+                    passDesc.textContent = `Valid until ${new Date(user.subscriptionExpiry).toLocaleDateString()}`;
+                }
+            } else if (user.isTrialEligible) {
+                passTitle.textContent = "28-DAY TRIAL PACK ELIGIBLE";
+                passTitle.className = "font-bold text-sm text-amber-400";
+                passDesc.textContent = "Trial pack will activate automatically on first order checkout.";
+            } else {
+                passTitle.textContent = "No Active Pass Subscription";
+                passTitle.className = "font-bold text-sm text-slate-300";
+                passDesc.textContent = "Customer has no active Flash-O Pass plan.";
+            }
+        }
+
+        const acqSource = document.getElementById("c-acq-source");
+        if (acqSource) acqSource.textContent = user.acquisitionSource || "Direct / Mobile App";
+
+        const prefPay = document.getElementById("c-preferred-payment");
+        if (prefPay) prefPay.textContent = user.preferredPaymentMethod || "COD / UPI";
+
+        const devModel = document.getElementById("c-device-model");
+        if (devModel) devModel.textContent = user.device || "Android Device";
+
+        const appVer = document.getElementById("c-app-version");
+        if (appVer) appVer.textContent = user.appVersion || "v1.0.0";
+
+        const delAddr = document.getElementById("c-delivery-address");
+        if (delAddr) delAddr.textContent = user.address || "Not provided";
+
+        const primaryAddr = document.getElementById("c-primary-address");
+        if (primaryAddr) primaryAddr.textContent = user.address || "Not provided";
+
+        const delNotes = document.getElementById("c-delivery-notes");
+        if (delNotes) delNotes.innerHTML = `<i class="fa-solid fa-motorcycle mr-1.5"></i> ${user.defaultDeliveryInstructions || "Leave at door / Call on arrival"}`;
+
+        const totalRefunded = document.getElementById("c-total-refunded");
+        if (totalRefunded) totalRefunded.textContent = `₹${user.totalRefundedAmount || 0}`;
+
+        const refundCount = document.getElementById("c-refund-count");
+        if (refundCount) refundCount.textContent = `${user.totalRefundsCount || 0} Claims`;
+
+        const ticketsCount = document.getElementById("c-tickets-count");
+        if (ticketsCount) ticketsCount.textContent = `${user.openSupportTicketsCount || 0} Open`;
+
+        const refundRiskBadge = document.getElementById("c-refund-risk-badge");
+        if (refundRiskBadge) {
+            const isHighRisk = (user.totalRefundsCount || 0) > 3 || (user.totalOrders > 0 && ((user.cancelledOrders || 0) / user.totalOrders) > 0.3);
+            if (isHighRisk) {
+                refundRiskBadge.innerHTML = `<span class="badge bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs px-3 py-1 font-bold animate-pulse"><i class="fa-solid fa-triangle-exclamation mr-1"></i> HIGH REFUND RISK</span>`;
+            } else {
+                refundRiskBadge.innerHTML = `<span class="badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1 font-bold"><i class="fa-solid fa-shield-check mr-1"></i> LOW DISPUTE RISK</span>`;
+            }
+        }
+
+        const cartValue = document.getElementById("c-cart-value");
+        if (cartValue) cartValue.textContent = `₹${user.cartAbandonedTotalValue || 0} (${user.cartAbandonedItemsCount || 0} Items)`;
+
+        const cartStatusBadge = document.getElementById("c-cart-status-badge");
+        if (cartStatusBadge) {
+            if ((user.cartAbandonedItemsCount || 0) > 0) {
+                cartStatusBadge.innerHTML = `<span class="badge bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-0.5 font-bold"><i class="fa-solid fa-cart-arrow-down mr-1"></i> CART PENDING</span>`;
+            } else {
+                cartStatusBadge.innerHTML = `<span class="badge bg-slate-800 text-slate-400 border border-slate-700 text-xs px-2.5 py-0.5 font-bold">NO PENDING CART</span>`;
+            }
+        }
+
+        const pushStatus = document.getElementById("c-push-status");
+        if (pushStatus) {
+            pushStatus.textContent = user.pushNotificationEnabled !== false ? "Enabled" : "Disabled";
+            pushStatus.className = user.pushNotificationEnabled !== false ? "font-bold text-emerald-400" : "font-bold text-rose-400";
+        }
+
+        const waStatus = document.getElementById("c-wa-status");
+        if (waStatus) {
+            waStatus.textContent = user.whatsappUpdatesOptIn !== false ? "Opted In" : "Opted Out";
+            waStatus.className = user.whatsappUpdatesOptIn !== false ? "font-bold text-emerald-400" : "font-bold text-rose-400";
+        }
+
+        const ratingScore = document.getElementById("c-rating-score");
+        if (ratingScore) ratingScore.textContent = `⭐ ${user.avgCustomerRating || 5.0} / 5.0`;
+    }
+
     // Reset Save Bar
     const saveBar = document.getElementById("fp-save-bar");
     if (saveBar) saveBar.classList.add("hidden");
+};
+
+window.saveMerchantPlatformDiscount = async function() {
+    if (!currentlyEditingUser) return;
+    const discountVal = parseFloat(document.getElementById("m-platform-discount-input")?.value || "0");
+    try {
+        const docRef = doc(db, currentlyEditingUser.collectionName || "sellers", currentlyEditingUser.uid);
+        await setDoc(docRef, { platformFeeDiscount: discountVal }, { merge: true });
+        currentlyEditingUser.platformFeeDiscount = discountVal;
+        if (window.showToast) window.showToast(`Platform Fee Discount saved as ${discountVal}%`, "success");
+    } catch (err) {
+        console.error("Error saving platform fee discount:", err);
+        if (window.showToast) window.showToast("Failed to save discount", "error");
+    }
+};
+
+window.saveAdminInternalNoteFromProfile = async function() {
+    if (!currentlyEditingUser) return;
+    const noteVal = document.getElementById("fp-admin-notes")?.value.trim() || "";
+    try {
+        const docRef = doc(db, currentlyEditingUser.collectionName || "users", currentlyEditingUser.uid);
+        await setDoc(docRef, { blockReason: noteVal, adminNotes: noteVal }, { merge: true });
+        currentlyEditingUser.blockReason = noteVal;
+        currentlyEditingUser.adminNotes = noteVal;
+        if (window.showToast) window.showToast("Admin internal note saved successfully!", "success");
+    } catch (err) {
+        console.error("Error saving internal note:", err);
+        if (window.showToast) window.showToast("Failed to save internal note", "error");
+    }
+};
+
+window.grantCustomerPassModal = async function() {
+    if (!currentlyEditingUser) return;
+    const tier = prompt("Enter Flash-O Pass Tier to grant (e.g. SILVER, GOLD, VIP):", "VIP");
+    if (!tier) return;
+    const expiryDays = 30;
+    const expiryTs = Date.now() + (expiryDays * 24 * 60 * 60 * 1000);
+    try {
+        const docRef = doc(db, currentlyEditingUser.collectionName || "customers", currentlyEditingUser.uid);
+        await setDoc(docRef, {
+            isSubscribed: true,
+            subscriptionTier: tier,
+            subscriptionExpiry: expiryTs
+        }, { merge: true });
+        if (window.showToast) window.showToast(`Granted 30-Day ${tier} Flash-O Pass!`, "success");
+        window.openUserProfile(currentlyEditingUser.uid, currentlyEditingUser.collectionName);
+    } catch (err) {
+        console.error("Error granting pass:", err);
+        if (window.showToast) window.showToast("Failed to grant pass", "error");
+    }
+};
+
+window.sendCustomerCouponModal = function() {
+    if (!currentlyEditingUser) return;
+    const code = prompt("Enter Coupon Code to send to customer:", "FLASHO100");
+    if (!code) return;
+    if (window.showToast) window.showToast(`Targeted coupon ${code} sent to ${currentlyEditingUser.name}!`, "success");
 };
 
 window.onProfileInputChange = function() {
@@ -383,7 +682,7 @@ window.handleFullProfileFormSubmit = async function(e) {
     try {
         await updateUserAccountInDb({ uid, colName, name, phone, email, role, dept, isActive, blockReason });
         if (window.showToast) window.showToast("User profile updated successfully!", "success");
-        window.openUserProfile(uid, colName); // Refresh view
+        window.openUserProfile(uid, colName);
     } catch (err) {
         console.error("Error updating user profile:", err);
         if (window.showToast) window.showToast("Failed to update profile: " + err.message, "error");

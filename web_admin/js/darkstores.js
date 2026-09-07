@@ -104,12 +104,27 @@ function renderDarkStoresGrid(stores) {
             const linkedMerchants = (sellersList || []).filter(s => s.darkStoreId === ds.id || merchantIds.includes(s.id));
             const linkedRiders = (ridersList || []).filter(r => r.darkStoreId === ds.id || riderIds.includes(r.id));
 
+            const isVacant = ds.isFranchiseVacant === true || ds.franchiseStatus === 'VACANT_INVESTMENT_OPEN';
+            const safeInvestment = escapeHtml(ds.investmentAmount || '');
+            const safeReason = escapeHtml(ds.vacancyReason || 'New Area Expansion');
+            const safeAreaSqFt = escapeHtml(ds.expectedAreaSqFt || '');
+
             return `
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-lg hover:border-slate-700 transition-all">
+                <div class="bg-slate-900 border ${isVacant ? 'border-amber-500/60 shadow-amber-500/10' : 'border-slate-800'} rounded-2xl p-6 space-y-4 shadow-lg hover:border-slate-700 transition-all">
+                    ${isVacant ? `
+                        <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="badge bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5"><i class="fa-solid fa-handshake-angle mr-1"></i> FRANCHISE VACANT</span>
+                                <span class="text-[10px] text-amber-300 font-bold">${safeReason}</span>
+                            </div>
+                            ${safeInvestment ? `<p class="text-xs text-amber-200 font-semibold mt-1"><i class="fa-solid fa-indian-rupee-sign mr-1"></i> Investment: ${safeInvestment} ${safeAreaSqFt ? `(${safeAreaSqFt})` : ''}</p>` : ''}
+                        </div>
+                    ` : ''}
+
                     <div class="flex justify-between items-start border-b border-slate-800 pb-3">
                         <div>
                             <h4 class="font-bold text-white text-base">${safeName}</h4>
-                            <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><i class="fa-solid fa-location-dot text-brand-400"></i> ${safeArea} (${safeAddress})</p>
+                            <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate" title="${safeArea} (${safeAddress})"><i class="fa-solid fa-location-dot text-brand-400"></i> ${safeArea} (${safeAddress})</p>
                         </div>
                         <span class="badge ${ds.isActive !== false ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
                             ${ds.isActive !== false ? 'Active Hub' : 'Inactive'}
@@ -117,7 +132,7 @@ function renderDarkStoresGrid(stores) {
                     </div>
 
                     <div class="space-y-2 text-xs text-slate-300">
-                        <p><strong class="text-slate-400">Manager:</strong> <span class="text-indigo-400">${safeManager}</span></p>
+                        <p class="truncate" title="Manager: ${safeManager}"><strong class="text-slate-400">Manager:</strong> <span class="text-indigo-400">${safeManager}</span></p>
                         <p><strong class="text-slate-400">Radii (KM):</strong> ${safeDelRad} (Delivery) | ${safeVisRad} (Visib) | <span class="text-amber-400 font-bold">${safeMerRad} (Merchant)</span></p>
 
                         <div class="flex items-center gap-2 pt-1">
@@ -367,6 +382,9 @@ window.editDarkStore = function(id) {
     setValue("ds-min-order-val", ds.minOrderValue !== undefined ? ds.minOrderValue : 99);
     setValue("ds-max-orders-per-rider", ds.maxOrdersPerRider !== undefined ? ds.maxOrdersPerRider : 3);
     setValue("ds-surge-multiplier", ds.surgeFeeMultiplier !== undefined ? ds.surgeFeeMultiplier : 1.0);
+    setValue("ds-surge-mode-type", ds.surgeModeType || 'NORMAL');
+    setValue("ds-rider-incentive-bonus", ds.riderIncentiveBonus !== undefined ? ds.riderIncentiveBonus : 0);
+    setValue("ds-order-timeout-mins", ds.orderTimeoutMins !== undefined ? ds.orderTimeoutMins : 10);
     setChecked("ds-auto-dispatch", ds.autoDispatchRiders !== false);
     setValue("ds-status-note", ds.statusNote || '');
 
@@ -382,6 +400,15 @@ window.editDarkStore = function(id) {
     setValue("ds-close", ds.closeTime || '23:00');
     setChecked("ds-active", ds.isActive !== false);
 
+    const isVacant = ds.isFranchiseVacant === true || ds.franchiseStatus === 'VACANT_INVESTMENT_OPEN';
+    setChecked("ds-is-franchise-vacant", isVacant);
+    setValue("ds-vacancy-reason", ds.vacancyReason || 'New Area Expansion');
+    setValue("ds-investment-amount", ds.investmentAmount || '');
+    setValue("ds-expected-area", ds.expectedAreaSqFt || '');
+    setValue("ds-franchise-phone", ds.franchiseContactPhone || '');
+    setValue("ds-franchise-email", ds.franchiseContactEmail || '');
+    setValue("ds-investment-notes", ds.investmentNotes || '');
+
     renderModalMerchantsList();
     renderModalRidersList();
 };
@@ -396,6 +423,15 @@ async function handleDarkStoreSubmit(e) {
     const existingId = getValue("ds-id");
     const dsId = existingId || 'ds_' + Date.now();
     const storeName = getValue("ds-name");
+    const isFranchiseVacant = getChecked("ds-is-franchise-vacant");
+
+    const minOrderInput = getValue("ds-min-order-val");
+    const minOrderValue = (minOrderInput === "0" || minOrderInput === "00" || minOrderInput.toLowerCase() === "none" || minOrderInput === "") ?
+                          (minOrderInput.toLowerCase() === "none" ? "none" : 0) : (isNaN(minOrderInput) ? minOrderInput : parseFloat(minOrderInput));
+
+    const maxRiderInput = getValue("ds-max-orders-per-rider");
+    const maxOrdersPerRider = (maxRiderInput === "0" || maxRiderInput === "-1" || maxRiderInput.toLowerCase() === "unlimited" || maxRiderInput.toLowerCase() === "none" || maxRiderInput === "") ?
+                              (maxRiderInput.toLowerCase() === "unlimited" ? "unlimited" : 999) : (isNaN(maxRiderInput) ? maxRiderInput : parseInt(maxRiderInput));
 
     const storeData = {
         id: dsId,
@@ -409,9 +445,12 @@ async function handleDarkStoreSubmit(e) {
         deliveryRadiusKm: getFloat("ds-delivery-radius", 5.0),
         visibilityRadiusKm: getFloat("ds-visibility-radius", 5.0),
         merchantRadiusKm: getFloat("ds-merchant-radius", 5.0),
-        minOrderValue: getFloat("ds-min-order-val", 99),
-        maxOrdersPerRider: getInt("ds-max-orders-per-rider", 3),
+        minOrderValue: minOrderValue,
+        maxOrdersPerRider: maxOrdersPerRider,
         surgeFeeMultiplier: getFloat("ds-surge-multiplier", 1.0),
+        surgeModeType: getValue("ds-surge-mode-type") || 'NORMAL',
+        riderIncentiveBonus: getFloat("ds-rider-incentive-bonus", 0),
+        orderTimeoutMins: getInt("ds-order-timeout-mins", 10),
         autoDispatchRiders: getChecked("ds-auto-dispatch"),
         statusNote: getValue("ds-status-note"),
         managerName: getValue("ds-manager-name"),
@@ -423,6 +462,14 @@ async function handleDarkStoreSubmit(e) {
         openTime: getValue("ds-open") || '07:00',
         closeTime: getValue("ds-close") || '23:00',
         isActive: getChecked("ds-active"),
+        isFranchiseVacant: isFranchiseVacant,
+        franchiseStatus: isFranchiseVacant ? "VACANT_INVESTMENT_OPEN" : "OPERATIONAL",
+        vacancyReason: getValue("ds-vacancy-reason"),
+        investmentAmount: getValue("ds-investment-amount"),
+        expectedAreaSqFt: getValue("ds-expected-area"),
+        franchiseContactPhone: getValue("ds-franchise-phone"),
+        franchiseContactEmail: getValue("ds-franchise-email"),
+        investmentNotes: getValue("ds-investment-notes"),
         assignedMerchantIds: Array.from(currentSelectedMerchantIds),
         assignedRiderIds: Array.from(currentSelectedRiderIds),
         updatedAt: Date.now()

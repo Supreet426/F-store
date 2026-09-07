@@ -1,6 +1,7 @@
 package com.fryumm.store.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.fryumm.store.ui.viewmodels.StoreViewModel
 import com.fryumm.store.data.model.OrderStatus
+import com.fryumm.store.data.model.Product
 import com.fryumm.store.ui.theme.FStorePurple
 import kotlinx.coroutines.delay
 
@@ -54,7 +56,7 @@ fun BatchPickingScreen(navController: NavHostController, viewModel: StoreViewMod
 
     // State for picked items
     val pickedProductIds = remember { mutableStateListOf<String>() }
-    var selectedItemForSubstitute by remember { mutableStateOf<String?>(null) }
+    var selectedItemForSubstitute by remember { mutableStateOf<Product?>(null) }
 
     Scaffold(
         topBar = {
@@ -183,12 +185,12 @@ fun BatchPickingScreen(navController: NavHostController, viewModel: StoreViewMod
                                 
                                 Row {
                                     IconButton(
-                                        onClick = { selectedItemForSubstitute = product.id }
+                                        onClick = { selectedItemForSubstitute = product }
                                     ) {
                                         Icon(
                                             Icons.Default.SwapHoriz, 
                                             contentDescription = "Substitute",
-                                            tint = Color.Gray
+                                            tint = if (product.substituteProductIds.isNotEmpty()) FStorePurple else Color.Gray
                                         )
                                     }
 
@@ -240,24 +242,47 @@ fun BatchPickingScreen(navController: NavHostController, viewModel: StoreViewMod
 
     // Substitute Request Dialog
     if (selectedItemForSubstitute != null) {
+        val substitutes = viewModel.products.filter { it.id in selectedItemForSubstitute!!.substituteProductIds }
+        
         AlertDialog(
             onDismissRequest = { selectedItemForSubstitute = null },
-            title = { Text("Request Out-of-Stock Substitute", fontWeight = FontWeight.Bold) },
-            text = { Text("Notify customer to approve an alternative item from available inventory?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        // In a production flow, triggers customer push notification
-                        selectedItemForSubstitute = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = FStorePurple)
-                ) {
-                    Text("SEND SUBSTITUTE REQ")
+            title = { Text("Smart Substitutes for ${selectedItemForSubstitute!!.name}", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (substitutes.isEmpty()) {
+                        Text("No predefined substitutes found for this item. Please select manually from inventory.", color = Color.Gray, fontSize = 13.sp)
+                    } else {
+                        Text("Select an alternative to suggest to the customer:", fontSize = 13.sp)
+                        substitutes.forEach { sub ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    // Find orders containing this item and request substitute
+                                    targetOrders.filter { order -> order.items.any { it.product.id == selectedItemForSubstitute!!.id } }
+                                        .forEach { order ->
+                                            viewModel.requestSubstitute(order.id, sub)
+                                        }
+                                    selectedItemForSubstitute = null
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+                            ) {
+                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Inventory, null, tint = FStorePurple, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(sub.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("₹${sub.price} • ${sub.stockQuantity} in stock", fontSize = 11.sp, color = Color.Gray)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             },
+            confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { selectedItemForSubstitute = null }) {
-                    Text("Cancel")
+                    Text("CLOSE")
                 }
             }
         )

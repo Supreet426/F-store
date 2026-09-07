@@ -63,7 +63,7 @@ fun UserActivityScreen(viewModel: StoreViewModel, navController: NavHostControll
 
     if (selectedUserForDetails != null) {
         when(selectedUserForDetails?.userRole) {
-            UserRole.STORE_OWNER -> {
+            UserRole.STORE_OWNER, UserRole.MERCHANT -> {
                 MerchantProfilePage(
                     profile = selectedUserForDetails!!,
                     viewModel = viewModel,
@@ -118,7 +118,6 @@ fun UserActivityScreen(viewModel: StoreViewModel, navController: NavHostControll
             initialRole = when(mainTab) {
                 "Merchants" -> UserRole.STORE_OWNER
                 "Riders" -> UserRole.RIDER
-                "Admins" -> UserRole.ADMIN
                 "Staff (Others)" -> UserRole.OTHER
                 else -> UserRole.STORE_OWNER
             },

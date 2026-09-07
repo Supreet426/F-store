@@ -2,9 +2,7 @@ package com.fryumm.store.ui.screens.profiles
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,12 +10,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -27,8 +26,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.fryumm.store.data.model.OrderStatus
-import com.fryumm.store.data.model.Product
 import com.fryumm.store.data.model.UserProfile
+import com.fryumm.store.ui.components.ProductCard
 import com.fryumm.store.ui.theme.FStorePurple
 import com.fryumm.store.ui.viewmodels.StoreViewModel
 import java.util.*
@@ -42,11 +41,15 @@ fun MerchantProfilePage(
 ) {
     val context = LocalContext.current
     val userOrders = viewModel.orders.filter { it.sellerId == profile.uid }
-    val merchantProducts = viewModel.products.filter { it.sellerId == profile.uid || (it.sellerName.isNotBlank() && it.sellerName.equals(profile.tradeName, ignoreCase = true)) }
+    val merchantProducts = viewModel.products.filter {
+        it.sellerId == profile.uid || (it.sellerName.isNotBlank() && it.sellerName.equals(profile.tradeName, ignoreCase = true))
+    }
 
     val deliveredOrders = userOrders.filter { it.status == OrderStatus.DELIVERED }
     val totalRevenue = deliveredOrders.sumOf { it.totalAmount }
     val pendingOrdersCount = userOrders.count { it.status in listOf(OrderStatus.PLACED, OrderStatus.ACCEPTED, OrderStatus.PREPARING) }
+    val cancelledOrdersCount = userOrders.count { it.status == OrderStatus.CANCELLED }
+
     val netMerchantPayout = deliveredOrders.sumOf { order ->
         order.items.sumOf { item ->
             val rate = if (item.product.merchantRate > 0) item.product.merchantRate else item.product.price
@@ -54,13 +57,49 @@ fun MerchantProfilePage(
         }
     }
     val platformCommission = totalRevenue - netMerchantPayout
+    val avgOrderValue = if (deliveredOrders.isNotEmpty()) totalRevenue / deliveredOrders.size else 0.0
+    val completionRate = if (userOrders.isNotEmpty()) (deliveredOrders.size.toFloat() / userOrders.size.toFloat() * 100f) else 0f
+
+    // Calculate Top 3 Bestsellers
+    val topBestsellers = remember(deliveredOrders) {
+        deliveredOrders.flatMap { it.items }
+            .groupBy { it.product.name }
+            .mapValues { entry -> entry.value.sumOf { it.quantity } }
+            .toList()
+            .sortedByDescending { it.second }
+            .take(3)
+    }
+
+    // Store Status & Availability
+    val isVacation = profile.vacationStart != null && profile.vacationEnd != null &&
+            System.currentTimeMillis() in profile.vacationStart..profile.vacationEnd
+    val storeStatusText = when {
+        !profile.active -> "BLOCKED"
+        isVacation -> "ON VACATION"
+        else -> "OPEN / LIVE"
+    }
+    val storeStatusColor = when {
+        !profile.active -> Color.Red
+        isVacation -> Color(0xFFFF9800)
+        else -> Color(0xFF2E7D32)
+    }
 
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabTitles = listOf("Overview & Legal", "Products (${merchantProducts.size})", "Financials", "Analytics")
+    val tabTitles = listOf(
+        "Profile Details",
+        "Products (${merchantProducts.size})",
+        "Financials & Analytics"
+    )
 
     var showBlockDialog by remember { mutableStateOf(false) }
     var blockReasonInput by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    var adminRemark by remember(profile.uid) { mutableStateOf(profile.blockReason ?: "") }
+    var isSavingRemark by remember { mutableStateOf(false) }
+
+    var platformDiscountInput by remember(profile.platformFeeDiscount) { mutableStateOf(profile.platformFeeDiscount.toString()) }
+    var showCommissionDialog by remember { mutableStateOf(false) }
 
     if (showBlockDialog) {
         AlertDialog(
@@ -123,6 +162,40 @@ fun MerchantProfilePage(
         )
     }
 
+    if (showCommissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showCommissionDialog = false },
+            title = { Text("Adjust Platform Discount Fee (%)", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Set custom platform fee discount for ${profile.tradeName.ifBlank { profile.name }}.")
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = platformDiscountInput,
+                        onValueChange = { platformDiscountInput = it },
+                        label = { Text("Discount Percentage (%)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val discountVal = platformDiscountInput.toDoubleOrNull() ?: 0.0
+                        viewModel.updateUserProfileDetails(profile.copy(platformFeeDiscount = discountVal))
+                        showCommissionDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A237E))
+                ) {
+                    Text("SAVE DISCOUNT")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCommissionDialog = false }) { Text("CANCEL") }
+            }
+        )
+    }
+
     // Revenue trend for last 7 days
     val trendData = remember(userOrders) {
         (0..6).map { i ->
@@ -152,17 +225,28 @@ fun MerchantProfilePage(
                     }
                 },
                 actions = {
+                    // Phone Call
                     IconButton(onClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${profile.phoneNumber}"))
                         context.startActivity(intent)
                     }) {
-                        Icon(Icons.Default.Phone, null, tint = Color.White)
+                        Icon(Icons.Default.Phone, contentDescription = "Call", tint = Color.White)
                     }
+                    // WhatsApp Direct
+                    IconButton(onClick = {
+                        val cleanPhone = profile.phoneNumber.replace("+", "").replace(" ", "")
+                        val formattedPhone = if (cleanPhone.length == 10) "91$cleanPhone" else cleanPhone
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$formattedPhone"))
+                        context.startActivity(intent)
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "WhatsApp", tint = Color(0xFF25D366))
+                    }
+                    // Email
                     IconButton(onClick = {
                         val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${profile.email}"))
                         context.startActivity(intent)
                     }) {
-                        Icon(Icons.Default.Email, null, tint = Color.White)
+                        Icon(Icons.Default.Email, contentDescription = "Email", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -222,10 +306,10 @@ fun MerchantProfilePage(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),
-                                    color = if (profile.active) Color(0xFF2E7D32) else Color.Red
+                                    color = storeStatusColor
                                 ) {
                                     Text(
-                                        if (profile.active) "ACTIVE MERCHANT" else "BLOCKED",
+                                        storeStatusText,
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 10.sp,
@@ -301,7 +385,7 @@ fun MerchantProfilePage(
                 }
             }
 
-            // Tab Navigation
+            // Tab Navigation - 3 Sections
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = Color.White,
@@ -311,7 +395,14 @@ fun MerchantProfilePage(
                     Tab(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        text = { Text(title, fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal, fontSize = 12.sp) }
+                        text = {
+                            Text(
+                                title,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 12.sp,
+                                maxLines = 1
+                            )
+                        }
                     )
                 }
             }
@@ -319,11 +410,12 @@ fun MerchantProfilePage(
             Spacer(Modifier.height(8.dp))
 
             when (selectedTab) {
-                // Tab 0: Overview & Legal Information
+                // Section 1: Merchants Profile Details
                 0 -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
                         item {
                             DetailCardSection(
@@ -350,16 +442,18 @@ fun MerchantProfilePage(
                                     "Bank Name" to profile.bankName.ifBlank { "Not provided" },
                                     "Account Holder" to profile.bankAccountName.ifBlank { "Not provided" },
                                     "Account Number" to profile.bankAccountNumber.ifBlank { "Not provided" },
-                                    "IFSC Code" to profile.bankIfscCode.ifBlank { "Not provided" }
+                                    "IFSC Code" to profile.bankIfscCode.ifBlank { "Not provided" },
+                                    "UPI ID (VPA)" to profile.upiId.ifBlank { "Not provided" }
                                 )
                             )
                         }
 
                         item {
                             DetailCardSection(
-                                title = "Store Address & Hub",
+                                title = "Store Operations & Hub",
                                 icon = Icons.Default.LocationOn,
                                 items = listOf(
+                                    "Store Operating Status" to storeStatusText,
                                     "Store Address" to profile.storeAddress.ifBlank { "Not provided" },
                                     "City / State" to "${profile.city}, ${profile.state} - ${profile.pincode}".trim(' ', ','),
                                     "Avg Prep Time" to "${profile.averagePreparationTime} Minutes",
@@ -374,12 +468,53 @@ fun MerchantProfilePage(
                                 icon = Icons.Default.CardGiftcard,
                                 items = listOf(
                                     "Merchant Referral Code" to profile.merchantReferralCode.ifBlank { "N/A" },
-                                    "Total Merchant Leads" to "${profile.referralCount}",
-                                    "Verified Onboardings" to "${profile.referralVerifiedCount}",
+                                    "Total Merchant Leads" to profile.referralCount.toString(),
+                                    "Verified Onboardings" to profile.referralVerifiedCount.toString(),
                                     "Flash-O Coins Balance" to "©${profile.flashOCoins.toInt()}",
                                     "Platform Fee Discount" to "${profile.platformFeeDiscount}%"
                                 )
                             )
+                        }
+
+                        // Admin Remarks / Notes Box
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.NoteAlt, null, tint = Color(0xFF1A237E), modifier = Modifier.size(20.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Admin Internal Notes & Remarks", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1A237E))
+                                    }
+                                    Spacer(Modifier.height(10.dp))
+                                    OutlinedTextField(
+                                        value = adminRemark,
+                                        onValueChange = { adminRemark = it },
+                                        placeholder = { Text("Enter internal notes, audit remarks or compliance flags...") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        minLines = 2,
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                        Button(
+                                            onClick = {
+                                                isSavingRemark = true
+                                                viewModel.updateUserProfileDetails(profile.copy(blockReason = adminRemark))
+                                                isSavingRemark = false
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A237E))
+                                        ) {
+                                            Text("Save Internal Note", fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         item {
@@ -399,103 +534,88 @@ fun MerchantProfilePage(
                     }
                 }
 
-                // Tab 1: Product Catalog
+                // Section 2: Products
                 1 -> {
-                    if (merchantProducts.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No products listed by this merchant.", color = Color.Gray)
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Summary Card at Top
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
-                            items(merchantProducts, key = { it.id }) { product ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("Merchant Product Catalog", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text("${merchantProducts.size} Total Items Listed", fontSize = 12.sp, color = Color.Gray)
+                                }
+                                val verifiedCount = merchantProducts.count { it.isVerified }
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color(0xFF2E7D32).copy(alpha = 0.1f)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Surface(
-                                            modifier = Modifier.size(56.dp),
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = Color(0xFFF1F3F4)
-                                        ) {
-                                            if (product.imageUrl.isNotEmpty()) {
-                                                AsyncImage(
-                                                    model = ImageRequest.Builder(context).data(product.imageUrl).crossfade(true).build(),
-                                                    contentDescription = null,
-                                                    contentScale = ContentScale.Crop
-                                                )
-                                            } else {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Icon(Icons.Default.Inventory2, null, tint = Color.Gray)
-                                                }
-                                            }
-                                        }
+                                    Text(
+                                        "$verifiedCount Verified",
+                                        color = Color(0xFF2E7D32),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
 
-                                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.height(8.dp))
 
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(product.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                            Text("Category: ${product.category} | Stock: ${product.stockQuantity}", fontSize = 11.sp, color = Color.Gray)
-                                            Spacer(Modifier.height(4.dp))
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text("Price: ₹${product.price}", fontWeight = FontWeight.Bold, color = FStorePurple, fontSize = 13.sp)
-                                                Spacer(Modifier.width(8.dp))
-                                                Text("Merchant Rate: ₹${product.merchantRate}", fontSize = 11.sp, color = Color(0xFFE65100))
-                                            }
-                                        }
-
-                                        Spacer(Modifier.width(8.dp))
-
-                                        Column(horizontalAlignment = Alignment.End) {
-                                            Surface(
-                                                shape = RoundedCornerShape(4.dp),
-                                                color = if (product.isVerified) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
-                                            ) {
-                                                Text(
-                                                    if (product.isVerified) "VERIFIED" else "PENDING",
-                                                    color = if (product.isVerified) Color(0xFF2E7D32) else Color(0xFFE65100),
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-
-                                            Spacer(Modifier.height(6.dp))
-
-                                            if (!product.isVerified) {
-                                                Button(
-                                                    onClick = { viewModel.approveProduct(product.id, 10.0, 5.0, product.deliveryCharge, product.taxRate) },
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                                ) {
-                                                    Text("Approve", fontSize = 10.sp)
-                                                }
-                                            }
-                                        }
-                                    }
+                        if (merchantProducts.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        Icons.Default.Inventory2,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(48.dp),
+                                        tint = Color.LightGray
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("No products listed by this merchant.", color = Color.Gray, fontSize = 14.sp)
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                contentPadding = PaddingValues(bottom = 24.dp)
+                            ) {
+                                items(merchantProducts, key = { it.id }) { product ->
+                                    ProductCard(
+                                        product = product,
+                                        viewModel = viewModel,
+                                        onEditClick = { }
+                                    )
                                 }
                             }
                         }
                     }
                 }
 
-                // Tab 2: Financials & Revenue Breakdown
+                // Section 3: Financial Details & Business Analytics
                 2 -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
+                        // 1. Financial Overview
                         item {
-                            SectionTitle("Financial Overview")
+                            SectionTitle("Financial Overview & Commission")
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 StatCard("Gross Sales", "₹${totalRevenue.toInt()}", Icons.Default.Payments, Color(0xFF4CAF50), Modifier.weight(1f))
                                 StatCard("Merchant Payout", "₹${netMerchantPayout.toInt()}", Icons.Default.AccountBalanceWallet, Color(0xFF2196F3), Modifier.weight(1f))
@@ -509,14 +629,81 @@ fun MerchantProfilePage(
                             }
                         }
 
+                        // Custom Commission / Fee Adjustment Card
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White)
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("Platform Fee Discount", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("Current Applied Discount: ${profile.platformFeeDiscount}%", fontSize = 12.sp, color = Color.Gray)
+                                    }
+                                    OutlinedButton(
+                                        onClick = { showCommissionDialog = true },
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Adjust Fee", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Bestselling Products Card
+                        if (topBestsellers.isNotEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Star, null, tint = Color(0xFFFFC107), modifier = Modifier.size(20.dp))
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("Top 3 Bestselling Products", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1A237E))
+                                        }
+                                        Spacer(Modifier.height(12.dp))
+                                        topBestsellers.forEachIndexed { index, (name, qty) ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("${index + 1}. $name", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray, maxLines = 1, modifier = Modifier.weight(1f))
+                                                Surface(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = Color(0xFF1A237E).copy(alpha = 0.1f)
+                                                ) {
+                                                    Text("$qty Units Sold", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A237E), modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                                                }
+                                            }
+                                            if (index < topBestsellers.size - 1) {
+                                                HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Order Status Summary", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    Text("Order Status Breakdown", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1A237E))
                                     Spacer(Modifier.height(12.dp))
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("Delivered Orders", fontSize = 13.sp, color = Color.Gray)
@@ -530,38 +717,55 @@ fun MerchantProfilePage(
                                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.5f))
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("Cancelled Orders", fontSize = 13.sp, color = Color.Gray)
-                                        Text("${userOrders.count { it.status == OrderStatus.CANCELLED }}", fontWeight = FontWeight.Bold, color = Color.Red)
+                                        Text("$cancelledOrdersCount", fontWeight = FontWeight.Bold, color = Color.Red)
+                                    }
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.5f))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Average Order Value (AOV)", fontSize = 13.sp, color = Color.Gray)
+                                        Text("₹${avgOrderValue.toInt()}", fontWeight = FontWeight.Bold, color = Color(0xFF1A237E))
                                     }
                                 }
                             }
                         }
-                    }
-                }
 
-                // Tab 3: Performance Analytics & Charts
-                3 -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
+                        // 2. Flasho Business Analytics
                         item {
+                            SectionTitle("Flasho Business Analytics")
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("7-Day Revenue Trend", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = Color(0xFF1A237E), modifier = Modifier.size(20.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("7-Day Revenue Trend", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1A237E))
+                                    }
                                     Spacer(Modifier.height(16.dp))
                                     SimpleLineChart(data = trendData, color = Color(0xFF1A237E))
                                     Spacer(Modifier.height(8.dp))
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("Min: ₹${trendData.minOrNull()?.toInt() ?: 0}", fontSize = 11.sp, color = Color.Gray)
-                                        Text("Max: ₹${trendData.maxOrNull()?.toInt() ?: 0}", fontSize = 11.sp, color = Color.Gray)
+                                        Text("Min Daily: ₹${trendData.minOrNull()?.toInt() ?: 0}", fontSize = 11.sp, color = Color.Gray)
+                                        Text("Max Daily: ₹${trendData.maxOrNull()?.toInt() ?: 0}", fontSize = 11.sp, color = Color.Gray)
                                     }
                                 }
                             }
+                        }
+
+                        item {
+                            DetailCardSection(
+                                title = "Flasho Performance Metrics",
+                                icon = Icons.Default.Analytics,
+                                items = listOf(
+                                    "Fulfillment Success Rate" to String.format(Locale.getDefault(), "%.1f%%", completionRate),
+                                    "Avg Preparation Time" to "${profile.averagePreparationTime} mins",
+                                    "Flash-O Coins Earned" to "©${profile.flashOCoins.toInt()}",
+                                    "Merchant Badge Tier" to profile.merchantBadge,
+                                    "Referral Leads Generated" to profile.referralCount.toString()
+                                )
+                            )
                         }
                     }
                 }

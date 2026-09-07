@@ -24,11 +24,6 @@ import java.util.Calendar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UnifiedInsightsScreen(viewModel: StoreViewModel) {
-    val adv = viewModel.getAdvancedAnalytics()
-    val kpis = viewModel.getBusinessKPIs()
-    val marketing = viewModel.getMarketingAnalytics()
-    val fraud = viewModel.getFraudAnalytics()
-    
     // Filter States for Analytics
     var dateFilterMode by remember { mutableStateOf("All Time") }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -75,9 +70,45 @@ fun UnifiedInsightsScreen(viewModel: StoreViewModel) {
         }
     }
 
-    val filteredOrders = viewModel.orders.filter { it.timestamp in dateRange }
-    val filteredSearches = viewModel.searchEvents.filter { it.timestamp in dateRange }
-    val filteredEvents = viewModel.customerEvents.filter { it.timestamp in dateRange }
+    val filteredOrders = remember(viewModel.orders, dateRange) {
+        viewModel.orders.filter { it.timestamp in dateRange }
+    }
+    val filteredSearches = remember(viewModel.searchEvents, dateRange) {
+        viewModel.searchEvents.filter { it.timestamp in dateRange }
+    }
+    val filteredEvents = remember(viewModel.customerEvents, dateRange) {
+        viewModel.customerEvents.filter { it.timestamp in dateRange }
+    }
+
+    val adv = remember(filteredOrders, filteredSearches, filteredEvents, viewModel.allCustomers, viewModel.products) {
+        viewModel.getAdvancedAnalytics(
+            targetOrders = filteredOrders,
+            targetSearches = filteredSearches,
+            targetEvents = filteredEvents,
+            targetCustomers = viewModel.allCustomers,
+            targetProducts = viewModel.products
+        )
+    }
+    val kpis = remember(filteredOrders, viewModel.allCustomers, viewModel.products) {
+        viewModel.getBusinessKPIs(
+            targetOrders = filteredOrders,
+            targetCustomers = viewModel.allCustomers,
+            targetProducts = viewModel.products
+        )
+    }
+    val marketing = remember(filteredOrders, filteredEvents, viewModel.allCustomers) {
+        viewModel.getMarketingAnalytics(
+            targetOrders = filteredOrders,
+            targetEvents = filteredEvents,
+            targetCustomers = viewModel.allCustomers
+        )
+    }
+    val fraud = remember(filteredOrders, viewModel.allCustomers) {
+        viewModel.getFraudAnalytics(
+            targetOrders = filteredOrders,
+            targetCustomers = viewModel.allCustomers
+        )
+    }
 
     var showReasonDialog by remember { mutableStateOf(false) }
 
@@ -144,7 +175,21 @@ fun UnifiedInsightsScreen(viewModel: StoreViewModel) {
                 )
             }
 
-            // 4. Google Search Analytics & Unmet Demand Gaps
+            // 4. Product & Category Intelligence Card
+            item {
+                ProductAndCategoryInsightsCard(
+                    productIntelligence = adv.productIntelligence
+                )
+            }
+
+            // 5. AI Stock Reorder & Demand Forecast Card
+            item {
+                DemandForecastCard(
+                    predictions = adv.demandPredictions
+                )
+            }
+
+            // 6. Google Search Analytics & Unmet Demand Gaps
             item {
                 SearchAndInventoryGapCard(
                     zeroSearches = adv.zeroResultSearches,
@@ -152,7 +197,7 @@ fun UnifiedInsightsScreen(viewModel: StoreViewModel) {
                 )
             }
 
-            // 5. Returns & Cancellation Impact
+            // 7. Returns & Cancellation Impact
             item {
                 val cancelledOrders = filteredOrders.filter { it.status == OrderStatus.CANCELLED || it.status == OrderStatus.RETURNED }
                 
@@ -184,22 +229,22 @@ fun UnifiedInsightsScreen(viewModel: StoreViewModel) {
                 }
             }
 
-            // 6. Marketing Attribution & Flash-O Pass Subscription
+            // 8. Marketing Attribution & Flash-O Pass Subscription
             item {
                 MarketingAndPassCard(
                     marketing = marketing,
-                    ordersCount = filteredOrders.size
+                    orders = filteredOrders
                 )
             }
 
-            // 7. Fraud & Risk Anomaly Detection
+            // 9. Fraud & Risk Anomaly Detection
             item {
                 FraudAndRiskCard(
                     fraud = fraud
                 )
             }
 
-            // 8. Search & Product Conversion Funnel
+            // 10. Search & Product Conversion Funnel
             item {
                 LocalConversionMetricsCard(
                     totalSearches = filteredSearches.size,
@@ -209,7 +254,7 @@ fun UnifiedInsightsScreen(viewModel: StoreViewModel) {
                 )
             }
 
-            // 9. Delivery Heatmap & Peak Hours
+            // 11. Delivery Heatmap & Peak Hours
             item {
                 LocalInsightSectionCard(title = "Delivery Heatmap & Hourly Load", icon = Icons.Default.LocalShipping, iconColor = Color(0xFF673AB7)) {
                     val heatMapData = filteredOrders.groupBy { 
@@ -230,12 +275,12 @@ fun UnifiedInsightsScreen(viewModel: StoreViewModel) {
                 }
             }
 
-            // 10. Local AI Insight Card
+            // 12. Local AI Insight Card
             item {
                 LocalAIInsightCard(orders = filteredOrders)
             }
             
-            // 11. Full Funnel Drop-off Analysis
+            // 13. Full Funnel Drop-off Analysis
             item {
                 LocalInsightSectionCard(title = "Core Funnel Performance Steps", icon = Icons.Default.AssignmentReturn, iconColor = FStorePurple) {
                     val steps = adv.funnel

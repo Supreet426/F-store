@@ -264,11 +264,7 @@ fun AddUserDialog(
     var roleExpanded by remember { mutableStateOf(false) }
     var deptExpanded by remember { mutableStateOf(false) }
 
-    val availableRoles = if (isMasterAdmin) {
-        listOf(UserRole.STORE_OWNER, UserRole.RIDER, UserRole.ADMIN, UserRole.OTHER)
-    } else {
-        listOf(UserRole.STORE_OWNER, UserRole.RIDER, UserRole.OTHER)
-    }
+    val availableRoles = listOf(UserRole.STORE_OWNER, UserRole.RIDER, UserRole.OTHER)
 
     val departments = listOf(
         "Helpline & Customer Support",

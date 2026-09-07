@@ -53,29 +53,77 @@ class NotificationRepository @Inject constructor(
             }
     }
 
-    suspend fun sendOrderCallNotification(targetUserId: String, orderId: String, customerName: String, amount: Double) {
+    suspend fun sendOrderCallNotification(
+        targetUserId: String,
+        orderId: String,
+        customerName: String,
+        amount: Double,
+        sellerId: String = "",
+        darkStoreId: String = ""
+    ) {
         try {
-            // In a real production app, this would be a call to a Cloud Function.
-            // For your ecosystem, we will write to a 'notifications' collection 
-            // that a Cloud Function can listen to, or send via FCM REST API.
-            
+            val targetTopic = when {
+                sellerId.isNotEmpty() -> "merchant_$sellerId"
+                darkStoreId.isNotEmpty() -> "darkstore_$darkStoreId"
+                else -> "admin_orders"
+            }
+
             val notificationData = mapOf(
                 "targetUid" to targetUserId,
+                "targetTopic" to targetTopic,
                 "type" to "ORDER_CALL",
                 "priority" to "high",
                 "data" to mapOf(
                     "orderId" to orderId,
                     "customerName" to customerName,
-                    "amount" to amount.toString()
+                    "amount" to amount.toString(),
+                    "targetUid" to targetUserId,
+                    "sellerId" to sellerId,
+                    "darkStoreId" to darkStoreId,
+                    "targetTopic" to targetTopic
                 ),
                 "timestamp" to System.currentTimeMillis(),
                 "status" to "pending"
             )
             
             firestore.collection("notifications").add(notificationData).await()
-            Log.d("NotificationRepo", "Order call notification queued for $targetUserId")
+            Log.d("NotificationRepo", "Order call notification queued for topic $targetTopic (user $targetUserId)")
         } catch (e: Exception) {
             Log.e("NotificationRepo", "Error triggering notification", e)
+        }
+    }
+
+    fun subscribeToUserTopics(userId: String, role: String, darkStoreId: String? = null, email: String? = null) {
+        try {
+            val fcm = FirebaseMessaging.getInstance()
+            if (userId.isNotEmpty()) {
+                fcm.subscribeToTopic("merchant_$userId")
+                    .addOnSuccessListener { Log.d("NotificationRepo", "Subscribed to topic: merchant_$userId") }
+            }
+
+            if (!darkStoreId.isNullOrEmpty()) {
+                fcm.subscribeToTopic("darkstore_$darkStoreId")
+                    .addOnSuccessListener { Log.d("NotificationRepo", "Subscribed to topic: darkstore_$darkStoreId") }
+            }
+
+            val isMasterAdmin = com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(email)
+            if (isMasterAdmin) {
+                fcm.subscribeToTopic("admin_orders")
+                    .addOnSuccessListener { Log.d("NotificationRepo", "Subscribed to topic: admin_orders") }
+            }
+        } catch (e: Exception) {
+            Log.e("NotificationRepo", "Failed to subscribe to FCM topics", e)
+        }
+    }
+
+    fun unsubscribeFromUserTopics(userId: String, darkStoreId: String? = null) {
+        try {
+            val fcm = FirebaseMessaging.getInstance()
+            if (userId.isNotEmpty()) fcm.unsubscribeFromTopic("merchant_$userId")
+            if (!darkStoreId.isNullOrEmpty()) fcm.unsubscribeFromTopic("darkstore_$darkStoreId")
+            fcm.unsubscribeFromTopic("admin_orders")
+        } catch (e: Exception) {
+            Log.e("NotificationRepo", "Failed to unsubscribe FCM topics", e)
         }
     }
 

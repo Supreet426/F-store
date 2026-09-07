@@ -27,12 +27,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.fryumm.store.ui.viewmodels.StoreViewModel
 import com.fryumm.store.data.model.OrderStatus
 import com.fryumm.store.data.model.UserRole
 import com.fryumm.store.ui.components.OrderCard
 import com.fryumm.store.ui.theme.FStorePurple
 import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun DashboardStatItem(label: String, value: String, color: Color, onClick: () -> Unit = {}) {
@@ -42,6 +44,38 @@ fun DashboardStatItem(label: String, value: String, color: Color, onClick: () ->
     ) {
         Text(value, fontSize = 16.sp, fontWeight = FontWeight.Black, color = color)
         Text(label, fontSize = 10.sp, color = Color.Gray, maxLines = 1, softWrap = false)
+    }
+}
+
+@Composable
+fun ImpactScoreCard(label: String, score: Double, icon: ImageVector, modifier: Modifier) {
+    val color = when {
+        score >= 7.0 -> Color(0xFFD32F2F)
+        score >= 4.0 -> Color(0xFFF57C00)
+        else -> Color(0xFF388E3C)
+    }
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(label, fontSize = 10.sp, color = Color.Gray)
+                Text(
+                    text = if (score > 0) String.format(Locale.getDefault(), "%.1f/10", score) else "Normal",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = color
+                )
+            }
+        }
     }
 }
 
@@ -216,6 +250,29 @@ fun MerchantDashboard(navController: NavHostController, viewModel: StoreViewMode
                         )
                     )
                 }
+            }
+        }
+
+        // Impact Scores (Weather & Events)
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ImpactScoreCard(
+                    label = "Weather Impact",
+                    score = viewModel.simulatedWeatherImpact,
+                    icon = Icons.Default.Cloud,
+                    modifier = Modifier.weight(1f)
+                )
+                ImpactScoreCard(
+                    label = "Event Surge",
+                    score = viewModel.simulatedEventImpact,
+                    icon = Icons.Default.Celebration,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 

@@ -4,12 +4,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -24,14 +26,281 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.fryumm.store.ui.viewmodels.StoreViewModel
 import com.fryumm.store.data.model.Product
-import com.fryumm.store.ui.components.AvailabilitySchedulingDialog
+import com.fryumm.store.data.model.UserRole
 import com.fryumm.store.ui.theme.FStorePurple
 import java.text.SimpleDateFormat
 import java.util.*
 
-import com.fryumm.store.data.model.UserRole
+@Composable
+fun ProductDetailDialog(
+    product: Product,
+    viewModel: StoreViewModel,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit
+) {
+    val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+    val dateStr = sdf.format(Date(product.addedAt))
+    val expiryStr = product.expiryDate?.let { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it)) }
 
-import androidx.compose.runtime.*
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = product.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                    Text(
+                        text = "Category: ${product.category}${if (product.subCategory.isNotBlank()) " > ${product.subCategory}" else ""}",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close")
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Product Image Banner
+                if (product.imageUrl.isNotBlank() || product.images.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = product.imageUrl.ifEmpty { product.images.firstOrNull() ?: "" },
+                            contentDescription = product.name,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                }
+
+                // Status Badges
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Surface(
+                        color = if (product.isAvailable) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = if (product.isAvailable) "● LIVE" else "● HIDDEN",
+                            color = if (product.isAvailable) Color(0xFF2E7D32) else Color.Red,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
+
+                    Surface(
+                        color = if (product.isVerified) Color(0xFFE3F2FD) else Color(0xFFFFF3E0),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = if (product.isVerified) "VERIFIED" else "PENDING APPROVAL",
+                            color = if (product.isVerified) Color(0xFF1565C0) else Color(0xFFE65100),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
+
+                    if (product.isFoodProduct) {
+                        Surface(color = Color(0xFFFFF3E0), shape = RoundedCornerShape(4.dp)) {
+                            Text(
+                                text = "FOOD ITEM",
+                                color = Color(0xFFE65100),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    if (product.isComingSoon) {
+                        Surface(color = Color(0xFFFFF8E1), shape = RoundedCornerShape(4.dp)) {
+                            Text(
+                                text = "COMING SOON",
+                                color = Color(0xFFF57F17),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Description
+                if (product.shortDescription.isNotBlank()) {
+                    Text(
+                        text = product.shortDescription,
+                        fontSize = 12.sp,
+                        color = Color.DarkGray,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                if (product.description.isNotBlank()) {
+                    Surface(
+                        color = Color(0xFFFAFAFA),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text("Description", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                            Spacer(Modifier.height(4.dp))
+                            Text(product.description, fontSize = 12.sp, color = Color.DarkGray)
+                        }
+                    }
+                }
+
+                if (product.specifications.isNotEmpty()) {
+                    Text("Specifications", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FStorePurple)
+                    ProductSpecificationsTable(product.specifications)
+                }
+
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+
+                // Pricing Details
+                Text("Pricing & Economics", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FStorePurple)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("Selling Price", fontSize = 11.sp, color = Color.Gray)
+                        Text("₹${product.price}", fontWeight = FontWeight.Black, fontSize = 18.sp, color = FStorePurple)
+                    }
+                    if (product.originalPrice > product.price) {
+                        Column {
+                            Text("MRP", fontSize = 11.sp, color = Color.Gray)
+                            Text("₹${product.originalPrice}", fontWeight = FontWeight.Bold, fontSize = 15.sp, style = TextStyle(textDecoration = TextDecoration.LineThrough), color = Color.Gray)
+                        }
+                    }
+                    Column {
+                        Text("Base Price", fontSize = 11.sp, color = Color.Gray)
+                        Text("₹${product.basePrice}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Merchant Rate", fontSize = 11.sp, color = Color.Gray)
+                        Text("₹${product.merchantRate}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFFE65100))
+                    }
+                }
+
+                // Tax & GST Details
+                Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("GST Tax Rate: ${product.taxRate}%", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B5E20))
+                            if (product.hsnCode.isNotBlank()) {
+                                Text("HSN: ${product.hsnCode}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B5E20))
+                            }
+                        }
+                        if (product.taxRate > 0) {
+                            Spacer(Modifier.height(4.dp))
+                            Text("CGST: ${product.cgstRate.takeIf { it > 0 } ?: (product.taxRate / 2)}% | SGST: ${product.sgstRate.takeIf { it > 0 } ?: (product.taxRate / 2)}%", fontSize = 10.sp, color = Color(0xFF2E7D32))
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+
+                // Inventory & Logistics
+                Text("Stock & Warehouse Location", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF5D4037))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("In Stock", fontSize = 11.sp, color = Color.Gray)
+                        Text("${product.stockQuantity} units", fontWeight = FontWeight.Black, fontSize = 15.sp, color = if (product.stockQuantity < product.minStockLevel) Color.Red else Color(0xFF2E7D32))
+                    }
+                    Column {
+                        Text("Min Order Qty", fontSize = 11.sp, color = Color.Gray)
+                        Text("${product.minOrderQuantity} units", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Aisle / Rack", fontSize = 11.sp, color = Color.Gray)
+                        Text("${product.aisle} - ${product.rack}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF5D4037))
+                    }
+                }
+
+                if (product.barcode.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.QrCode, null, tint = FStorePurple, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Barcode / SKU: ", fontSize = 11.sp, color = Color.Gray)
+                        Text(product.barcode, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FStorePurple)
+                    }
+                }
+
+                if (expiryStr != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Event, null, tint = Color.Red, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Expiry Date: ", fontSize = 11.sp, color = Color.Gray)
+                        Text(expiryStr, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Red)
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Schedule, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Added: $dateStr", fontSize = 11.sp, color = Color.Gray)
+                }
+
+                if (product.searchNames.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("Search Keywords:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Text(product.searchNames.joinToString(", "), fontSize = 11.sp, color = Color.DarkGray)
+                }
+
+                if (!product.adminFeedback.isNullOrBlank()) {
+                    Surface(color = Color(0xFFFFFDE7), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text("Admin Notes / Changes:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF57F17))
+                            Spacer(Modifier.height(4.dp))
+                            Text(product.adminFeedback!!, fontSize = 11.sp, color = Color.DarkGray)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onDismiss()
+                    onEdit()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = FStorePurple)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("EDIT PRODUCT", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("CLOSE")
+            }
+        }
+    )
+}
 
 @Composable
 fun ProductVerificationDialog(product: Product, viewModel: StoreViewModel, onDismiss: () -> Unit, onApprove: (Double, Double, Double, Double) -> Unit) {
@@ -139,12 +408,25 @@ fun ProductCard(
     val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
     val addedDate = sdf.format(Date(product.addedAt))
     val isAdmin = viewModel.currentUserProfile?.userRole == UserRole.ADMIN || viewModel.isMasterAdmin
+    var showDetailDialog by remember { mutableStateOf(false) }
     var showVerifyDialog by remember { mutableStateOf(false) }
     var showSequenceDialog by remember { mutableStateOf(false) }
     var showScheduleDialog by remember { mutableStateOf(false) }
     
     // Find merchant name
     val merchant = if (isAdmin) viewModel.allUsers.find { it.uid == product.sellerId } else null
+
+    if (showDetailDialog) {
+        ProductDetailDialog(
+            product = product,
+            viewModel = viewModel,
+            onDismiss = { showDetailDialog = false },
+            onEdit = {
+                showDetailDialog = false
+                onEditClick()
+            }
+        )
+    }
 
     if (showVerifyDialog) {
         ProductVerificationDialog(
@@ -188,7 +470,13 @@ fun ProductCard(
         )
     }
 
-    Card(modifier = Modifier.fillMaxWidth().clickable { onEditClick() }, shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showDetailDialog = true }, 
+        shape = RoundedCornerShape(12.dp), 
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Admin controls for sequence and merchant info
             if (isAdmin) {
@@ -256,7 +544,9 @@ fun ProductCard(
                         AsyncImage(
                             model = product.imageUrl,
                             contentDescription = null,
-                            modifier = Modifier.size(50.dp).background(Color.White, RoundedCornerShape(8.dp)),
+                            modifier = Modifier
+                                .size(50.dp)
+                                .background(Color.White, RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop
                         )
                         Spacer(Modifier.width(12.dp))
@@ -380,6 +670,26 @@ fun ProductCard(
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // View details button
+                    IconButton(onClick = { showDetailDialog = true }) {
+                        Icon(
+                            Icons.Default.Visibility,
+                            contentDescription = "View Details",
+                            tint = FStorePurple,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Edit product button
+                    IconButton(onClick = onEditClick) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit Product",
+                            tint = Color.DarkGray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     if (isAdmin) {
                         val isInDeal = viewModel.dynamicAppConfig.flashSale?.productIds?.contains(product.id) == true
                         IconButton(onClick = { 

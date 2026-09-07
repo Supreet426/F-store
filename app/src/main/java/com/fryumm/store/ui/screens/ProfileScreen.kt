@@ -1,6 +1,9 @@
 package com.fryumm.store.ui.screens
 
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -28,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.fryumm.store.IncomingOrderActivity
 import com.fryumm.store.ui.viewmodels.StoreViewModel
 import com.fryumm.store.data.model.UserProfile
 import com.fryumm.store.data.model.UserRole
@@ -48,6 +52,7 @@ fun ProfileScreen(
 
     val context = LocalContext.current
     var showAvailabilityDialog by remember { mutableStateOf(false) }
+    var showRingSettingsDialog by remember { mutableStateOf(false) }
     
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -247,6 +252,9 @@ fun ProfileScreen(
                         ProfileTextField("IFSC Code", editableProfile.bankIfscCode, isEditing, placeholder = "HDFC0001234") { 
                             editableProfile = editableProfile.copy(bankIfscCode = it) 
                         }
+                        ProfileTextField("UPI ID (VPA) for Payouts", editableProfile.upiId, isEditing, placeholder = "name@bank") { 
+                            editableProfile = editableProfile.copy(upiId = it) 
+                        }
                     }
                 }
             }
@@ -281,6 +289,12 @@ fun ProfileScreen(
             item {
                 ProfileSection(title = "Quick Settings", icon = Icons.Default.Settings) {
                     Column {
+                        ProfileMenuItem(
+                            icon = Icons.Default.NotificationsActive,
+                            title = "Order Ring & Background Settings",
+                            onClick = { showRingSettingsDialog = true }
+                        )
+
                         ProfileMenuItem(
                             icon = Icons.Default.Schedule,
                             title = "Operating Hours",
@@ -333,6 +347,147 @@ fun ProfileScreen(
             }
         )
     }
+
+    if (showRingSettingsDialog) {
+        OrderRingSettingsDialog(
+            onDismiss = { showRingSettingsDialog = false }
+        )
+    }
+}
+
+@Composable
+fun OrderRingSettingsDialog(
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.NotificationsActive, null, tint = FStorePurple)
+                Spacer(Modifier.width(8.dp))
+                Text("Order Ring & Background Settings", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Ensure your phone rings loudly for new orders even when the screen is off or locked (WhatsApp-like alert).",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+                
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("1. Battery Optimization", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Disable battery restrictions so background orders are never killed.", fontSize = 11.sp, color = Color.Gray)
+                        Button(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    val intent = Intent(Settings.ACTION_SETTINGS)
+                                    context.startActivity(intent)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = FStorePurple),
+                            modifier = Modifier.fillMaxWidth().height(36.dp)
+                        ) {
+                            Text("Open Battery Settings", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("2. Full-Screen Intent Permission", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Allow app to pop up incoming order screen over lock screen.", fontSize = 11.sp, color = Color.Gray)
+                            Button(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:${context.packageName}"))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                                        context.startActivity(intent)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = FStorePurple),
+                                modifier = Modifier.fillMaxWidth().height(36.dp)
+                            ) {
+                                Text("Allow Full-Screen Alarms", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("3. Notification Sound & Channel", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Verify High Importance & Alarm Sound are enabled for Order Calls.", fontSize = 11.sp, color = Color.Gray)
+                        Button(
+                            onClick = {
+                                try {
+                                    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                            putExtra(Settings.EXTRA_CHANNEL_ID, "order_call_channel")
+                                        }
+                                    } else {
+                                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                                    context.startActivity(intent)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = FStorePurple),
+                            modifier = Modifier.fillMaxWidth().height(36.dp)
+                        ) {
+                            Text("Open Notification Settings", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                // Test Ring Button
+                OutlinedButton(
+                    onClick = {
+                        val testIntent = Intent(context, IncomingOrderActivity::class.java).apply {
+                            putExtra("orderId", "TEST_ORDER_123")
+                            putExtra("customerName", "Test Customer (Rahul)")
+                            putExtra("amount", "499.0")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(testIntent)
+                    },
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = FStorePurple)
+                ) {
+                    Icon(Icons.Default.NotificationsActive, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Test Incoming Order Ring", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done", color = FStorePurple, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 @Composable

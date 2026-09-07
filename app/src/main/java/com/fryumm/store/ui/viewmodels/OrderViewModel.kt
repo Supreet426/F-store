@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.fryumm.store.data.model.*
 import com.fryumm.store.data.repository.NotificationRepository
 import com.fryumm.store.data.repository.OrderRepository
+import com.fryumm.store.util.OrderNotificationHelper
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -40,6 +41,7 @@ class OrderViewModel @Inject constructor(
     var riders by mutableStateOf<List<Rider>>(emptyList())
 
     private var rawOrders = emptyList<Order>()
+    private var cachedUserProfile: UserProfile? = null
 
     private val _uiEvent = MutableSharedFlow<UiEvent>()
     val uiEvent: SharedFlow<UiEvent> = _uiEvent.asSharedFlow()
@@ -54,7 +56,11 @@ class OrderViewModel @Inject constructor(
             orderRepository.getNewOrders().collect { newList ->
                 if (rawOrders.isNotEmpty() && newList.size > rawOrders.size) {
                     val newOrders = newList.filter { newOrder -> rawOrders.none { it.id == newOrder.id } }
-                    if (newOrders.any { it.status == OrderStatus.PLACED }) {
+                    val relevantNewOrders = newOrders.filter { order ->
+                        OrderNotificationHelper.shouldNotifyUserForOrder(cachedUserProfile, order)
+                    }
+
+                    if (relevantNewOrders.any { it.status == OrderStatus.PLACED }) {
                         playOrderSound()
                         _uiEvent.emit(UiEvent.ShowSuccess("NEW ORDER RECEIVED!"))
                     }
@@ -68,7 +74,7 @@ class OrderViewModel @Inject constructor(
                 }
 
                 rawOrders = newList
-                filterOrders(null)
+                filterOrders(cachedUserProfile)
             }
         }
     }
@@ -223,7 +229,10 @@ class OrderViewModel @Inject constructor(
     }
 
     fun filterOrders(currentUserProfile: UserProfile?, masterAdmins: List<String> = emptyList()) {
-        val profile = currentUserProfile
+        if (currentUserProfile != null) {
+            this.cachedUserProfile = currentUserProfile
+        }
+        val profile = currentUserProfile ?: cachedUserProfile
         if (profile == null) {
             orders = rawOrders
             return
@@ -233,10 +242,20 @@ class OrderViewModel @Inject constructor(
         orders = if (isAdmin) {
             rawOrders
         } else {
-            if (profile.userRole == UserRole.RIDER) {
-                rawOrders.filter { it.deliveryAgentId == profile.uid }
-            } else {
-                rawOrders.filter { it.sellerId == profile.uid }
+            when (profile.userRole) {
+                UserRole.RIDER -> rawOrders.filter { it.deliveryAgentId == profile.uid }
+                UserRole.CUSTOMER -> emptyList()
+                else -> {
+                    // MERCHANT or DARK STORE
+                    rawOrders.filter { order ->
+                        order.sellerId == profile.uid ||
+                        (!profile.darkStoreId.isNullOrEmpty() && order.sellerId == profile.darkStoreId) ||
+                        order.items.any { item ->
+                            item.product.sellerId == profile.uid ||
+                            (!profile.darkStoreId.isNullOrEmpty() && item.product.sellerId == profile.darkStoreId)
+                        }
+                    }
+                }
             }
         }.sortedByDescending { it.timestamp }
     }

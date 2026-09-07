@@ -1,4 +1,4 @@
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
@@ -130,7 +130,23 @@ exports.onFcmBroadcastCreated = functions.firestore
                 },
                 data: {
                     type: "ADMIN_BROADCAST",
-                    broadcastId: broadcastId
+                    broadcastId: broadcastId,
+                    click_action: "FLUTTER_NOTIFICATION_CLICK"
+                },
+                android: {
+                    priority: "high",
+                    notification: {
+                        sound: "default",
+                        channelId: "general_notifications"
+                    }
+                },
+                apns: {
+                    payload: {
+                        aps: {
+                            contentAvailable: true,
+                            sound: "default"
+                        }
+                    }
                 }
             };
 
@@ -241,9 +257,15 @@ exports.onNotificationCreated = functions.firestore
             let message;
 
             if (data.type === "BROADCAST") {
-                // Send to all customers via topic
+                let targetTopic = "all_customers";
+                if (data.target === "riders") targetTopic = "riders";
+                else if (data.target === "merchants") targetTopic = "merchants";
+                else if (data.target === "active_customers") targetTopic = "active_customers";
+                else if (data.target === "inactive_customers") targetTopic = "inactive_customers";
+
+                // Send to targeted topic
                 message = {
-                    topic: "all_customers",
+                    topic: targetTopic,
                     notification: {
                         title: data.title,
                         body: data.body,
@@ -254,8 +276,22 @@ exports.onNotificationCreated = functions.firestore
                         imageUrl: data.imageUrl || ""
                     },
                     android: {
+                        priority: "high",
                         notification: {
-                            imageUrl: data.imageUrl || ""
+                            imageUrl: data.imageUrl || "",
+                            sound: "default",
+                            channelId: "general_notifications"
+                        }
+                    },
+                    apns: {
+                        payload: {
+                            aps: {
+                                contentAvailable: true,
+                                sound: "default"
+                            }
+                        },
+                        fcm_options: {
+                            image: data.imageUrl || ""
                         }
                     }
                 };
@@ -315,6 +351,13 @@ exports.onNotificationCreated = functions.firestore
                     },
                     data: {
                         actionUrl: data.actionUrl || ""
+                    },
+                    android: {
+                        priority: "high",
+                        notification: {
+                            sound: "default",
+                            channelId: "general_notifications"
+                        }
                     }
                 };
             }
@@ -333,3 +376,109 @@ exports.onNotificationCreated = functions.firestore
             return snapshot.ref.update({ status: "failed", error: error.message });
         }
     });
+
+/**
+ * CASHFREE PAYMENT GATEWAY INTEGRATION
+ */
+
+// 1. Create Cashfree Order (Callable)
+exports.createCashfreeOrder = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Authentication required");
+    }
+
+    const { orderId, amount, customerId, customerPhone, customerEmail, customerName } = data;
+
+    // Use environment variables for production: functions.config().cashfree.app_id
+    const APP_ID = "YOUR_CASHFREE_APP_ID";
+    const SECRET_KEY = "YOUR_CASHFREE_SECRET_KEY";
+    const IS_SANDBOX = true; // Set to false for production
+
+    const baseUrl = IS_SANDBOX ? "https://sandbox.cashfree.com/pg/orders" : "https://api.cashfree.com/pg/orders";
+
+    try {
+        const response = await fetch(baseUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-client-id": APP_ID,
+                "x-client-secret": SECRET_KEY,
+                "x-api-version": "2023-08-01"
+            },
+            body: JSON.stringify({
+                order_id: orderId,
+                order_amount: amount,
+                order_currency: "INR",
+                customer_details: {
+                    customer_id: customerId,
+                    customer_phone: customerPhone,
+                    customer_email: customerEmail || "customer@flasho.com",
+                    customer_name: customerName || "Customer"
+                },
+                order_meta: {
+                    notify_url: `https://${process.env.GCLOUD_PROJECT}.cloudfunctions.net/cashfreeWebhook`
+                }
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            console.error("Cashfree Order Creation Failed:", result);
+            throw new functions.https.HttpsError("internal", result.message || "Failed to create Cashfree order");
+        }
+
+        return {
+            payment_session_id: result.payment_session_id,
+            order_id: result.order_id,
+            order_status: result.order_status
+        };
+    } catch (error) {
+        console.error("Cashfree Error:", error);
+        throw new functions.https.HttpsError("internal", error.message);
+    }
+});
+
+// 2. Cashfree Webhook Handler
+exports.cashfreeWebhook = functions.https.onRequest(async (req, res) => {
+    // Note: In production, you MUST verify the signature header 'x-webhook-signature'
+    const payload = req.body;
+    const orderData = payload.data?.order;
+    const paymentData = payload.data?.payment;
+
+    if (!orderData || !paymentData) {
+        return res.status(400).send("Invalid payload");
+    }
+
+    const orderId = orderData.order_id;
+    const paymentStatus = paymentData.payment_status; // SUCCESS, FAILED, PENDING
+
+    console.log(`Webhook Received: Order ${orderId}, Status ${paymentStatus}`);
+
+    try {
+        const db = admin.firestore();
+        const orderRef = db.collection("orders").doc(orderId);
+        const orderSnap = await orderRef.get();
+
+        if (orderSnap.exists) {
+            const updates = {
+                paymentStatus: paymentStatus === "SUCCESS" ? "SUCCESS" : "FAILED",
+                cashfreePaymentId: paymentData.cf_payment_id,
+                updatedAt: Date.now()
+            };
+
+            // If success, we might want to update order status as well if it was PENDING_PAYMENT
+            if (paymentStatus === "SUCCESS") {
+                // updates.status = "PLACED";
+            }
+
+            await orderRef.update(updates);
+            console.log(`Order ${orderId} updated via webhook to ${paymentStatus}`);
+        }
+
+        res.status(200).send("Webhook Processed");
+    } catch (error) {
+        console.error("Webhook Error:", error);
+        res.status(500).send("Internal Server Error");
+    }
+});

@@ -1,6 +1,8 @@
 package com.fryumm.store.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -385,5 +388,55 @@ fun LayoutChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
             fontWeight = FontWeight.Bold,
             color = if (isSelected) Color.White else Color.Black
         )
+    }
+}
+
+@Composable
+fun ProductSpecificationsTable(specifications: Map<String, String>) {
+    if (specifications.isEmpty()) return
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(0.5.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(8.dp))
+    ) {
+        specifications.entries.forEachIndexed { index, entry ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(if (index % 2 == 0) Color.White else Color(0xFFFAFAFA)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(Color(0xFFF9F9F9))
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = entry.key,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(2f)
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = entry.value,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.Black
+                    )
+                }
+            }
+            if (index < specifications.size - 1) {
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.2f), thickness = 0.5.dp)
+            }
+        }
     }
 }

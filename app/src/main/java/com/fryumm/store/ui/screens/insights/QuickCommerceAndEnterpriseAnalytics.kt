@@ -29,7 +29,7 @@ fun QuickCommerceSlaCard(
 ) {
     val avgTotalTime = operational.avgDeliveryTimeMinutes.coerceAtLeast(10)
     val slaComplianceRate = if (avgTotalTime <= 15) (100 - (operational.lateDeliveries * 3)).coerceIn(80, 98) else 74
-    val estimatedStockoutLoss = outOfStockProducts.size * 350.0
+    val estimatedStockoutLoss = outOfStockProducts.sumOf { p -> (p.price.takeIf { it > 0 } ?: 150.0) * p.minOrderQuantity.coerceAtLeast(1) }
 
     LocalInsightSectionCard(
         title = "Quick Commerce 10-Min SLA & Logistics (Zepto / Blinkit)",
@@ -119,9 +119,9 @@ fun UnitEconomicsCard(
         Spacer(Modifier.height(12.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MetricBox("Gross Profit (CM1)", "₹${kpis.grossProfit.toInt()}", "22% Margin", Color(0xFF2E7D32), Modifier.weight(1f))
+            MetricBox("Gross Profit (CM1)", "₹${kpis.grossProfit.toInt()}", "Direct Margin", Color(0xFF2E7D32), Modifier.weight(1f))
             MetricBox("Net CM2", "₹${kpis.contributionMargin.toInt()}", "Post-Logistics", Color(0xFF00838F), Modifier.weight(1f))
-            MetricBox("ROAS", "${kpis.roas}x", "Ad Return", Color(0xFFE65100), Modifier.weight(1f))
+            MetricBox("ROAS", "${String.format("%.1f", kpis.roas)}x", "Ad Return", Color(0xFFE65100), Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(16.dp))
@@ -138,7 +138,7 @@ fun UnitEconomicsCard(
             }
             Column {
                 Text("D30 Retention", fontSize = 10.sp, color = Color.Gray)
-                Text("${kpis.retentionRate}%", fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color(0xFF1565C0))
+                Text("${String.format("%.1f", kpis.retentionRate)}%", fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color(0xFF1565C0))
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("Cancellation / Return Rate", fontSize = 10.sp, color = Color.Gray)
@@ -210,8 +210,20 @@ fun SearchAndInventoryGapCard(
 @Composable
 fun MarketingAndPassCard(
     marketing: MarketingAnalytics,
-    ordersCount: Int
+    orders: List<Order>
 ) {
+    val subscribedOrders = orders.filter { it.subscribed }
+    val nonSubscribedOrders = orders.filter { !it.subscribed }
+    val subAov = if (subscribedOrders.isNotEmpty()) subscribedOrders.map { it.totalAmount }.average() else 0.0
+    val nonSubAov = if (nonSubscribedOrders.isNotEmpty()) nonSubscribedOrders.map { it.totalAmount }.average() else 0.0
+    val liftPct = if (nonSubAov > 0 && subAov > 0) ((subAov - nonSubAov) / nonSubAov * 100) else 0.0
+
+    val liftDisplayText = when {
+        subscribedOrders.isNotEmpty() && liftPct != 0.0 -> "${if (liftPct > 0) "+" else ""}${String.format("%.1f", liftPct)}% AOV"
+        subscribedOrders.isNotEmpty() -> "₹${subAov.toInt()} Sub. AOV"
+        else -> "${orders.count { it.subscribed }} Pass Subscribed"
+    }
+
     LocalInsightSectionCard(
         title = "Marketing Attribution & Flash-O Pass Lift",
         icon = Icons.Default.Campaign,
@@ -224,7 +236,7 @@ fun MarketingAndPassCard(
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("Pass Subscribed AOV Lift", fontSize = 11.sp, color = Color.Gray)
-                Text("+28% Higher AOV", fontWeight = FontWeight.Black, fontSize = 18.sp, color = Color(0xFF2E7D32))
+                Text(liftDisplayText, fontWeight = FontWeight.Black, fontSize = 18.sp, color = Color(0xFF2E7D32))
             }
         }
 
@@ -240,7 +252,7 @@ fun MarketingAndPassCard(
                         Text("$percentage%", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     LinearProgressIndicator(
-                        progress = { percentage / 100f },
+                        progress = { (percentage / 100f).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth().height(4.dp),
                         color = Color(0xFF7B1FA2),
                         trackColor = Color(0xFF7B1FA2).copy(alpha = 0.1f),
@@ -274,13 +286,14 @@ fun FraudAndRiskCard(
 
         Spacer(Modifier.height(12.dp))
 
-        if (fraud.couponAbuse.isEmpty()) {
+        if (fraud.couponAbuse.isEmpty() && fraud.multipleAccounts.isEmpty()) {
             Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
                 Text("✓ No active severe fraud anomalies detected", modifier = Modifier.padding(12.dp), fontSize = 11.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Medium)
             }
         } else {
+            val allRisks = (fraud.multipleAccounts + fraud.couponAbuse + fraud.referralFraud + fraud.highReturners).take(3)
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                fraud.couponAbuse.take(3).forEach { incident ->
+                allRisks.forEach { incident ->
                     Surface(color = Color(0xFFFFEBEE), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
                         Row(modifier = Modifier.padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
@@ -290,6 +303,95 @@ fun FraudAndRiskCard(
                             Surface(color = Color.Red, shape = RoundedCornerShape(4.dp)) {
                                 Text(incident.riskLevel.name, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProductAndCategoryInsightsCard(
+    productIntelligence: ProductIntelligence
+) {
+    LocalInsightSectionCard(
+        title = "Product & Best-Sellers Intelligence",
+        icon = Icons.Default.MonetizationOn,
+        iconColor = Color(0xFF00838F)
+    ) {
+        if (productIntelligence.bestSellers.isNotEmpty()) {
+            Text("Top Best-Selling Products", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
+            Spacer(Modifier.height(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                productIntelligence.bestSellers.take(4).forEach { item ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(item.productName, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text("${item.totalSold} units sold", fontSize = 10.sp, color = Color.Gray)
+                        }
+                        Text("₹${item.revenue.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color(0xFF2E7D32))
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+            Spacer(Modifier.height(12.dp))
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column {
+                Text("Out-Of-Stock Items", fontSize = 10.sp, color = Color.Gray)
+                Text("${productIntelligence.outOfStock.size} Products", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.Red)
+            }
+            Column {
+                Text("Low Stock Warning", fontSize = 10.sp, color = Color.Gray)
+                Text("${productIntelligence.lowStock.size} Products", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFFFF8F00))
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("Dead Stock Items", fontSize = 10.sp, color = Color.Gray)
+                Text("${productIntelligence.deadStock.size} Products", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.Gray)
+            }
+        }
+    }
+}
+
+@Composable
+fun DemandForecastCard(
+    predictions: List<DemandPrediction>
+) {
+    if (predictions.isEmpty()) return
+
+    LocalInsightSectionCard(
+        title = "AI Stock Reorder & Demand Forecast",
+        icon = Icons.Default.ElectricBolt,
+        iconColor = Color(0xFF0288D1)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            predictions.take(4).forEach { pred ->
+                Surface(
+                    color = Color(0xFFE1F5FE),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(pred.productName, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                            Text("Current Stock: ${pred.currentStock} | Est. Demand: ${pred.predictedDemand}", fontSize = 10.sp, color = Color.DarkGray)
+                        }
+                        Surface(
+                            color = if (pred.recommendation.contains("Restock", ignoreCase = true) || pred.recommendation.contains("Low", ignoreCase = true)) Color.Red else Color(0xFF0288D1),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(pred.recommendation, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

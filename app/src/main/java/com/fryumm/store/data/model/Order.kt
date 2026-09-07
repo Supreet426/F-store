@@ -37,11 +37,17 @@ data class Order(
     val readyAt: Long? = null,
     val sellerLatitude: Double? = null,
     val sellerLongitude: Double? = null,
+    val liveLat: Double? = null,
+    val liveLng: Double? = null,
     val deliveryCharge: Double = 0.0,
     val handlingFee: Double = 0.0,
     val roundingOff: Double = 0.0,
     val distanceKm: Double = 0.0,
     var trackingHistory: List<TrackingStep> = emptyList(),
+    
+    // Cashfree Payments
+    val cashfreeOrderId: String? = null,
+    val cashfreePaymentId: String? = null,
 
     // Substitute Product Flow & Stock Reservation Locking
     val substituteRequested: Boolean = false,

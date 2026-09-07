@@ -158,6 +158,7 @@ fun MainScreen(
     }
 
     var initialAuthChecked by remember { mutableStateOf(false) }
+    var isRegistering by remember { mutableStateOf(false) }
 
     LaunchedEffect(isAuthLoading) {
         if (!isAuthLoading) {
@@ -208,43 +209,71 @@ fun MainScreen(
     }
 
     if (userProfile == null) {
-        LoginScreen(
-            isLoading = isAuthLoading,
-            authError = authError,
-            authSuccess = authSuccess,
-            onClearError = {
-                authError = null
-                authSuccess = null
-            },
-            onContactSupport = {
-                val supportNumber = "9235900175"
-                val url = "https://api.whatsapp.com/send?phone=91$supportNumber&text=I need help with login to F-Store"
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    data = android.net.Uri.parse(url)
-                }
-                context.startActivity(intent)
-            },
-            onGoogleLogin = {
-                authError = null
-                authSuccess = null
-                try {
-                    val webClientId = try {
-                        context.getString(R.string.default_web_client_id)
+        if (isRegistering) {
+            RegistrationScreen(
+                authViewModel = authViewModel,
+                storeViewModel = viewModel,
+                onBack = { isRegistering = false },
+                onGoogleLogin = {
+                    authError = null
+                    authSuccess = null
+                    try {
+                        val webClientId = try {
+                            context.getString(R.string.default_web_client_id)
+                        } catch (e: Exception) {
+                            "216011846150-c3gne9t3c3t2angcqftb39vck8vm50nf.apps.googleusercontent.com"
+                        }
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestIdToken(webClientId)
+                            .requestEmail()
+                            .build()
+                        val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                        googleSignInLauncher.launch(googleSignInClient.signInIntent)
                     } catch (e: Exception) {
-                        "216011846150-c3gne9t3c3t2angcqftb39vck8vm50nf.apps.googleusercontent.com"
+                        authError = "Could not start Google Sign-In: ${e.localizedMessage}"
                     }
-                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                        .requestIdToken(webClientId)
-                        .requestEmail()
-                        .build()
-                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
-                    googleSignInLauncher.launch(googleSignInClient.signInIntent)
-                } catch (e: Exception) {
-                    val msg = "Could not start Google Sign-In: ${e.localizedMessage}"
-                    authError = msg
                 }
-            }
-        )
+            )
+        } else {
+            LoginScreen(
+                isLoading = isAuthLoading,
+                authError = authError,
+                authSuccess = authSuccess,
+                onClearError = {
+                    authError = null
+                    authSuccess = null
+                },
+                onRegister = { isRegistering = true },
+                onContactSupport = {
+                    val supportNumber = "9235900175"
+                    val url = "https://api.whatsapp.com/send?phone=91$supportNumber&text=I need help with login to F-Store"
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data = android.net.Uri.parse(url)
+                    }
+                    context.startActivity(intent)
+                },
+                onGoogleLogin = {
+                    authError = null
+                    authSuccess = null
+                    try {
+                        val webClientId = try {
+                            context.getString(R.string.default_web_client_id)
+                        } catch (e: Exception) {
+                            "216011846150-c3gne9t3c3t2angcqftb39vck8vm50nf.apps.googleusercontent.com"
+                        }
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestIdToken(webClientId)
+                            .requestEmail()
+                            .build()
+                        val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                        googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                    } catch (e: Exception) {
+                        val msg = "Could not start Google Sign-In: ${e.localizedMessage}"
+                        authError = msg
+                    }
+                }
+            )
+        }
         return
     }
 
@@ -266,10 +295,10 @@ fun MainScreen(
     }
 
     // Master Admin Emails
-    val masterAdmins = listOf("ranjanamishra1117@gmail.com", "supreet.mishr@gmail.com")
+    val masterAdmins = com.fryumm.store.util.MasterAdminSecurity.MASTER_ADMIN_EMAILS
 
     // Admin Detection (STRICT: Whitelisted Master Admins Only)
-    val isAdmin = masterAdmins.contains(userProfile.email.lowercase().trim()) || userProfile.userRole == UserRole.ADMIN
+    val isAdmin = com.fryumm.store.util.MasterAdminSecurity.isMasterAdminEmail(userProfile.email) || userProfile.userRole == UserRole.ADMIN
 
     val currentTitle = when {
         currentRoute == "orders" -> "Live Orders Board"
@@ -484,6 +513,17 @@ fun MainScreen(
                         icon = { Icon(Icons.Default.TrackChanges, null) },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
+
+                    NavigationDrawerItem(
+                        label = { Text("Ecosystem Update", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "app_update",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("app_update")
+                        },
+                        icon = { Icon(Icons.Default.CloudSync, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
@@ -675,6 +715,7 @@ fun MainScreen(
                 composable("promotion") { PromotionScreen(viewModel, navController) }
                 composable("insights") { UnifiedInsightsScreen(viewModel) }
                 composable("inventory") { InventoryScreen(navController, viewModel) }
+                composable("inventory_alerts") { InventoryAlertsScreen(viewModel, navController) }
                 composable("dispatch") { 
                     DispatchScreen(
                         viewModel = viewModel, 

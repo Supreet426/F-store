@@ -42,6 +42,7 @@ if (formPush) {
     formPush.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        const target = document.getElementById('push-target').value;
         const title = document.getElementById('push-title').value;
         const body = document.getElementById('push-body').value;
         const imageUrl = document.getElementById('push-image').value;
@@ -51,7 +52,7 @@ if (formPush) {
         try {
             const notification = {
                 type: 'BROADCAST',
-                target: 'ALL_CUSTOMERS',
+                target: target,
                 title: title,
                 body: body,
                 imageUrl: imageUrl || null,

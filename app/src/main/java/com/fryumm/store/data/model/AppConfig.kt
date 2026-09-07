@@ -38,20 +38,32 @@ data class DynamicAppConfig(
     val appDownloadLink: String = "https://play.google.com/store/apps/details?id=com.flash-o.customer",
     val referralDiscountPercent: Double = 50.0, // 50% off for referred customers
     val maxReferralDiscount: Double = 100.0,
-
+    val weatherImpact: Double = 0.0,
+    val eventImpact: Double = 0.0,
     val lastUpdated: Long = System.currentTimeMillis()
 )
 
 data class AppUpdateInfo(
-    val appId: String = "", // "customer", "partner", "store"
-    val appName: String = "", 
+    val appId: String = "", // "customer", "partner", "store", "web", etc.
+    val appName: String = "",
+    val appDescription: String = "",
+    val iconUrl: String = "",
+    val category: String = "Ecosystem App",
     val versionCode: Int = 1,
     val versionName: String = "1.0.0",
     val downloadUrl: String = "",
+    val playStoreUrl: String = "",
+    val directApkUrl: String = "", // Google Drive or direct APK URL
+    val githubUrl: String = "",
+    val websiteUrl: String = "",
     val releaseNotes: String = "",
     val isMandatory: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
-)
+) {
+    fun getEffectiveDownloadUrl(): String {
+        return directApkUrl.ifEmpty { downloadUrl.ifEmpty { playStoreUrl.ifEmpty { websiteUrl } } }
+    }
+}
 
 
 data class FlashOPassTier(
