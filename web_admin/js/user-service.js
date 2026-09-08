@@ -175,7 +175,6 @@ function parseCollectionDocs(colName, docs) {
         }
 
         return {
-            ...data,
             uid: uid,
             name: displayName,
             email: email,
@@ -299,9 +298,8 @@ function mergeAndDeduplicateUsers() {
                 ? existing.uid
                 : user.uid;
 
-            user = { ...existing, ...user };
             user.uid = preferredUid;
-            user.role = isMaster ? "ADMIN" : (user.role || existing.role || "OTHER");
+            user.role = isMaster ? "ADMIN" : "OTHER";
             user.name = (user.name && user.name !== "User" && user.name !== "Customer" && !user.name.startsWith("User (")) ? user.name : existing.name;
             user.email = user.email || existing.email;
             user.phone = (user.phone && user.phone !== "N/A") ? user.phone : existing.phone;

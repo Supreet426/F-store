@@ -1,6 +1,6 @@
 <!-- CLICKABLE KPI CARDS -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-    <div onclick="openOrdersWithFilter('ALL')" class="kpi-card cursor-pointer hover:border-emerald-500/50 hover:-translate-y-1 transition-all">
+    <div onclick="switchTab('orders')" class="kpi-card cursor-pointer hover:border-emerald-500/50 hover:-translate-y-1 transition-all">
         <div class="flex justify-between items-start">
             <div>
                 <p class="text-slate-400 text-xs font-medium uppercase tracking-wider">Today's Revenue</p>
@@ -15,7 +15,7 @@
         </p>
     </div>
 
-    <div onclick="openOrdersWithFilter('ACTIVE')" class="kpi-card cursor-pointer hover:border-brand-500/50 hover:-translate-y-1 transition-all">
+    <div onclick="switchTab('orders')" class="kpi-card cursor-pointer hover:border-brand-500/50 hover:-translate-y-1 transition-all">
         <div class="flex justify-between items-start">
             <div>
                 <p class="text-slate-400 text-xs font-medium uppercase tracking-wider">Active Orders</p>
@@ -57,31 +57,65 @@
     </div>
 </div>
 
-<div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
-    <div class="flex items-center justify-between mb-6">
-        <h3 class="font-bold text-lg text-white">Control Center Shortcuts</h3>
-        <span class="text-xs text-slate-400">Instantly update system features</span>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="font-bold text-lg text-white">Control Center Shortcuts</h3>
+            <span class="text-xs text-slate-400">Instantly update system features</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <button onclick="switchTab('app-control')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
+                <i class="fa-solid fa-rectangle-ad text-brand-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
+                <p class="text-sm font-semibold text-white">Banner Ads</p>
+                <p class="text-xs text-slate-400 mt-0.5">Customer Carousel</p>
+            </button>
+            <button onclick="switchTab('app-control')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
+                <i class="fa-solid fa-bolt text-amber-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
+                <p class="text-sm font-semibold text-white">Flash Sale</p>
+                <p class="text-xs text-slate-400 mt-0.5">Discount Engine</p>
+            </button>
+            <button onclick="openUsersWithFilter('ALL')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
+                <i class="fa-solid fa-user-plus text-emerald-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
+                <p class="text-sm font-semibold text-white">Add User</p>
+                <p class="text-xs text-slate-400 mt-0.5">Multi-Role Signup</p>
+            </button>
+            <button onclick="switchTab('products')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
+                <i class="fa-solid fa-plus-circle text-indigo-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
+                <p class="text-sm font-semibold text-white">Add Product</p>
+                <p class="text-xs text-slate-400 mt-0.5">Catalog Item</p>
+            </button>
+            <button onclick="switchTab('dark-stores')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
+                <i class="fa-solid fa-store text-purple-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
+                <p class="text-sm font-semibold text-white">Dark Stores</p>
+                <p class="text-xs text-slate-400 mt-0.5">Fulfillment Hubs</p>
+            </button>
+            <button onclick="switchTab('coupons')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
+                <i class="fa-solid fa-ticket text-sky-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
+                <p class="text-sm font-semibold text-white">Promos & Coupons</p>
+                <p class="text-xs text-slate-400 mt-0.5">Discount Codes</p>
+            </button>
+        </div>
     </div>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <button onclick="openUsersWithFilter('ALL')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
-            <i class="fa-solid fa-user-plus text-emerald-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
-            <p class="text-sm font-semibold text-white">Add User</p>
-            <p class="text-xs text-slate-400 mt-0.5">Multi-Role Signup</p>
-        </button>
-        <button onclick="switchTab('products')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
-            <i class="fa-solid fa-plus-circle text-indigo-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
-            <p class="text-sm font-semibold text-white">Add Product</p>
-            <p class="text-xs text-slate-400 mt-0.5">Catalog Item</p>
-        </button>
-        <button onclick="switchTab('dark-stores')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
-            <i class="fa-solid fa-store text-purple-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
-            <p class="text-sm font-semibold text-white">Dark Stores</p>
-            <p class="text-xs text-slate-400 mt-0.5">Fulfillment Hubs</p>
-        </button>
-        <button onclick="switchTab('coupons')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
-            <i class="fa-solid fa-ticket text-sky-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
-            <p class="text-sm font-semibold text-white">Promos & Coupons</p>
-            <p class="text-xs text-slate-400 mt-0.5">Discount Codes</p>
-        </button>
+
+    <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+        <h3 class="font-bold text-lg text-white mb-4">Live System Status</h3>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl border border-slate-800">
+                <span class="text-xs font-medium text-slate-300">Flash Sale</span>
+                <span id="status-flash-sale" class="badge bg-slate-800 text-slate-400">Checking...</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl border border-slate-800">
+                <span class="text-xs font-medium text-slate-300">Flash-O Pass</span>
+                <span id="status-pass-active" class="badge bg-slate-800 text-slate-400">Checking...</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl border border-slate-800">
+                <span class="text-xs font-medium text-slate-300">Popup Broadcast</span>
+                <span id="status-popup-active" class="badge bg-slate-800 text-slate-400">Checking...</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl border border-slate-800">
+                <span class="text-xs font-medium text-slate-300">Dark Store Hubs</span>
+                <span id="kpi-active-dark-stores" class="text-xs font-bold text-purple-400">Loading...</span>
+            </div>
+        </div>
     </div>
 </div>

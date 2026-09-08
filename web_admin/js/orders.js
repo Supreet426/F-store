@@ -10,30 +10,6 @@ import { escapeHtml, exportToCsv } from './utils.js';
 let ordersList = [];
 let availableRidersList = [];
 let activeStatusFilter = "ALL";
-window.activeStatusFilter = activeStatusFilter;
-
-window.handleOrderStatusFilter = function(status) {
-    activeStatusFilter = status;
-    window.activeStatusFilter = status;
-    filterAndRenderOrders();
-};
-
-window.handleOrderSearch = function(query) {
-    filterAndRenderOrders();
-};
-
-window.openOrdersWithFilter = function(status = 'ALL') {
-    activeStatusFilter = status;
-    window.activeStatusFilter = status;
-    if (typeof window.switchTab === 'function') {
-        window.switchTab('orders');
-    }
-    const selectEl = document.getElementById("filter-order-status");
-    if (selectEl) {
-        selectEl.value = status;
-    }
-    filterAndRenderOrders();
-};
 
 export function initOrdersListener() {
     onSnapshot(collection(db, "orders"), (snapshot) => {
@@ -61,16 +37,9 @@ export function initOrdersListener() {
 function updateOrdersKPIs(orders) {
     const today = new Date().setHours(0, 0, 0, 0);
 
-    const activeOrders = orders.filter(o => {
-        const st = (o.orderStatus || o.status || 'PLACED').toUpperCase();
-        return st !== 'DELIVERED' && st !== 'CANCELLED';
-    });
-
+    const activeOrders = orders.filter(o => o.orderStatus !== 'DELIVERED' && o.orderStatus !== 'CANCELLED');
     const todayRevenue = orders
-        .filter(o => {
-            const st = (o.orderStatus || o.status || 'PLACED').toUpperCase();
-            return (o.createdAt || 0) >= today && st === 'DELIVERED';
-        })
+        .filter(o => (o.createdAt || 0) >= today && o.orderStatus === 'DELIVERED')
         .reduce((sum, o) => sum + (o.totalAmount || o.grandTotal || 0), 0);
 
     const kpiRevenue = document.getElementById("kpi-revenue");
@@ -90,29 +59,23 @@ function updateOrdersKPIs(orders) {
 
 export function filterAndRenderOrders() {
     const searchVal = document.getElementById("search-order-input")?.value.toLowerCase().trim() || "";
-    const currentFilter = activeStatusFilter || window.activeStatusFilter || "ALL";
 
     const filtered = ordersList.filter(o => {
-        const status = (o.orderStatus || o.status || "PLACED").toUpperCase();
-
-        const matchesStatus = currentFilter === "ALL" ||
-            (currentFilter === "ACTIVE" && status !== "DELIVERED" && status !== "CANCELLED") ||
-            status === currentFilter;
+        const matchesStatus = activeStatusFilter === "ALL" ||
+            (activeStatusFilter === "ACTIVE" && o.orderStatus !== "DELIVERED" && o.orderStatus !== "CANCELLED") ||
+            o.orderStatus === activeStatusFilter;
 
         const matchesSearch = !searchVal ||
-            (o.id || "").toLowerCase().includes(searchVal) ||
+            o.id.toLowerCase().includes(searchVal) ||
             (o.customerName || "").toLowerCase().includes(searchVal) ||
             (o.customerPhone || "").toLowerCase().includes(searchVal) ||
-            (o.assignedRiderName || o.riderName || "").toLowerCase().includes(searchVal) ||
-            (o.storeName || o.merchantName || "").toLowerCase().includes(searchVal) ||
-            (o.deliveryAddress || "").toLowerCase().includes(searchVal);
+            (o.assignedRiderName || "").toLowerCase().includes(searchVal);
 
         return matchesStatus && matchesSearch;
     });
 
     renderOrdersGrid(filtered);
 }
-window.filterAndRenderOrders = filterAndRenderOrders;
 
 function renderOrdersGrid(orders) {
     const container = document.getElementById("orders-list-container");
@@ -139,8 +102,7 @@ function renderOrdersGrid(orders) {
         const safeDeliveryAddress = escapeHtml(o.deliveryAddress || 'Standard Delivery Zone');
         const safeLat = escapeHtml(o.deliveryLatitude || o.latitude || 28.6139);
         const safeLng = escapeHtml(o.deliveryLongitude || o.longitude || 77.2090);
-        const status = (o.orderStatus || o.status || 'PLACED').toUpperCase();
-        const isCancelled = status === 'CANCELLED';
+        const isCancelled = o.orderStatus === 'CANCELLED';
 
         const itemsHtml = (o.items || []).map(i => {
             const safeQty = escapeHtml(i.quantity || 1);
@@ -161,7 +123,7 @@ function renderOrdersGrid(orders) {
                             </button>
                         </h4>
                     </div>
-                    ${getOrderStatusBadge(status)}
+                    ${getOrderStatusBadge(o.orderStatus)}
                 </div>
 
                 <!-- CONTACT BAR: CALL CUSTOMER / MERCHANT / RIDER -->
@@ -204,13 +166,13 @@ function renderOrdersGrid(orders) {
                     <div class="flex items-center gap-2">
                         <strong class="text-emerald-400 font-bold text-base">₹${escapeHtml(o.totalAmount || o.grandTotal || 0)}</strong>
                         <select onchange="handleOrderStatusChange('${safeId}', this.value)" class="bg-slate-800 border border-slate-700 text-xs font-bold text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-500">
-                            <option value="PLACED" ${status === 'PLACED' ? 'selected' : ''}>PLACED</option>
-                            <option value="ACCEPTED" ${status === 'ACCEPTED' ? 'selected' : ''}>ACCEPTED</option>
-                            <option value="PREPARING" ${status === 'PREPARING' ? 'selected' : ''}>PREPARING</option>
-                            <option value="READY" ${status === 'READY' ? 'selected' : ''}>READY</option>
-                            <option value="DISPATCHED" ${status === 'DISPATCHED' ? 'selected' : ''}>DISPATCHED</option>
-                            <option value="DELIVERED" ${status === 'DELIVERED' ? 'selected' : ''}>DELIVERED</option>
-                            <option value="CANCELLED" ${status === 'CANCELLED' ? 'selected' : ''}>CANCELLED</option>
+                            <option value="PLACED" ${o.orderStatus === 'PLACED' ? 'selected' : ''}>PLACED</option>
+                            <option value="ACCEPTED" ${o.orderStatus === 'ACCEPTED' ? 'selected' : ''}>ACCEPTED</option>
+                            <option value="PREPARING" ${o.orderStatus === 'PREPARING' ? 'selected' : ''}>PREPARING</option>
+                            <option value="READY" ${o.orderStatus === 'READY' ? 'selected' : ''}>READY</option>
+                            <option value="DISPATCHED" ${o.orderStatus === 'DISPATCHED' ? 'selected' : ''}>DISPATCHED</option>
+                            <option value="DELIVERED" ${o.orderStatus === 'DELIVERED' ? 'selected' : ''}>DELIVERED</option>
+                            <option value="CANCELLED" ${o.orderStatus === 'CANCELLED' ? 'selected' : ''}>CANCELLED</option>
                         </select>
                     </div>
                 </div>
@@ -220,8 +182,8 @@ function renderOrdersGrid(orders) {
 }
 
 function getOrderStatusBadge(status) {
-    const safeStatus = escapeHtml(status || 'PLACED').toUpperCase();
-    switch (safeStatus) {
+    const safeStatus = escapeHtml(status || 'PLACED');
+    switch (status) {
         case 'DELIVERED':
             return `<span class="badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">DELIVERED</span>`;
         case 'CANCELLED':
@@ -245,7 +207,6 @@ window.updateOrderStatus = async function(orderId, newStatus) {
     try {
         await updateDoc(doc(db, "orders", orderId), {
             orderStatus: newStatus,
-            status: newStatus,
             updatedAt: Date.now()
         });
         if (window.showToast) window.showToast(`Order #${orderId.slice(0,6)} status changed to ${newStatus}`, "success");
@@ -337,7 +298,6 @@ window.submitCancelOrder = async function(e) {
     try {
         await updateDoc(doc(db, "orders", orderId), {
             orderStatus: "CANCELLED",
-            status: "CANCELLED",
             cancellationReason: finalReason,
             cancelledAt: Date.now(),
             updatedAt: Date.now()
@@ -395,7 +355,6 @@ window.submitReassignRider = async function(e) {
             assignedRiderName: riderName,
             assignedRiderPhone: riderPhone,
             orderStatus: "DISPATCHED",
-            status: "DISPATCHED",
             updatedAt: Date.now()
         });
         if (window.showToast) window.showToast(`Order assigned to ${riderName}`, "success");
@@ -428,7 +387,7 @@ window.exportOrdersCsv = function() {
             o.assignedRiderName || '',
             o.deliveryAddress || '',
             o.totalAmount || o.grandTotal || 0,
-            o.orderStatus || o.status || 'PLACED',
+            o.orderStatus || 'PLACED',
             createdDate,
             itemSummary
         ];
@@ -438,19 +397,12 @@ window.exportOrdersCsv = function() {
     exportToCsv(`orders_report_${dateStr}.csv`, headers, rows);
 };
 
-// Document-level delegated listeners ensure dynamically re-injected header inputs trigger re-filtering
-document.addEventListener("change", (e) => {
-    if (e.target && e.target.id === "filter-order-status") {
-        window.handleOrderStatusFilter(e.target.value);
-    }
-});
-
-document.addEventListener("input", (e) => {
-    if (e.target && e.target.id === "search-order-input") {
-        window.handleOrderSearch(e.target.value);
-    }
-});
-
 document.addEventListener("DOMContentLoaded", () => {
     initOrdersListener();
+
+    document.getElementById("search-order-input")?.addEventListener("input", filterAndRenderOrders);
+    document.getElementById("filter-order-status")?.addEventListener("change", (e) => {
+        activeStatusFilter = e.target.value;
+        filterAndRenderOrders();
+    });
 });

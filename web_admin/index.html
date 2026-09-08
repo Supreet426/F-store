@@ -41,14 +41,11 @@
 </head>
 <body class="h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 overflow-x-hidden">
 
-    <!-- SECURE AUTHENTICATION OVERLAY CONTAINER -->
-    <div id="login-overlay-container"></div>
-
     <!-- TOAST NOTIFICATION CONTAINER -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-[110] flex flex-col gap-2 max-w-sm"></div>
 
     <!-- MAIN APP CONTAINER -->
-    <div id="main-app" class="flex-1 flex flex-col overflow-hidden relative hidden" style="display: none;">
+    <div id="main-app" class="flex-1 flex flex-col overflow-hidden relative" style="display: flex;">
 
         <!-- CLEAN TOP HEADER BAR (Z-50 ALWAYS ON TOP) -->
         <header class="h-16 border-b border-slate-800/80 bg-slate-900/95 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between sticky top-0 z-50 shrink-0 shadow-md gap-3">
@@ -67,9 +64,17 @@
                 <h2 id="page-title" class="text-sm sm:text-base font-black text-white tracking-wide truncate max-w-[180px] sm:max-w-none">Product Catalog & Inventory</h2>
             </div>
 
-            <!-- Right Section: Header Actions / Controls -->
+            <!-- Center/Actions Section: SHIFTED ALL TAB ACTION BUTTONS DIRECTLY TO TITLE BAR -->
             <div id="header-actions-container" class="flex items-center gap-2 flex-nowrap overflow-x-auto py-1 no-scrollbar shrink">
                 <!-- Dynamically injected per active tab -->
+            </div>
+
+            <!-- Right Section: Refresh Sync -->
+            <div class="flex items-center gap-2 shrink-0">
+                <button onclick="window.location.reload()" title="Refresh Sync" class="w-9 h-9 sm:w-auto bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white text-xs px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 border border-slate-700/80 cursor-pointer">
+                    <i class="fa-solid fa-rotate text-brand-400"></i>
+                    <span class="hidden sm:inline">Refresh Sync</span>
+                </button>
             </div>
         </header>
 
@@ -87,6 +92,9 @@
                     <nav class="p-3 space-y-1">
                         <button data-tab="overview" class="nav-btn active">
                             <i class="fa-solid fa-chart-pie w-5"></i> Overview
+                        </button>
+                        <button data-tab="app-control" class="nav-btn">
+                            <i class="fa-solid fa-sliders w-5"></i> App Control Center
                         </button>
                         <button data-tab="products" class="nav-btn">
                             <i class="fa-solid fa-box-open w-5"></i> Products & Catalog
@@ -151,7 +159,7 @@
                     <section id="tab-overview" class="tab-content space-y-8">
                         <!-- CLICKABLE KPI CARDS -->
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div onclick="openOrdersWithFilter('ALL')" class="kpi-card cursor-pointer hover:border-emerald-500/50 hover:-translate-y-1 transition-all">
+                            <div onclick="switchTab('orders')" class="kpi-card cursor-pointer hover:border-emerald-500/50 hover:-translate-y-1 transition-all">
                                 <div class="flex justify-between items-start">
                                     <div>
                                         <p class="text-slate-400 text-xs font-medium uppercase tracking-wider">Today's Revenue</p>
@@ -166,7 +174,7 @@
                                 </p>
                             </div>
 
-                            <div onclick="openOrdersWithFilter('ACTIVE')" class="kpi-card cursor-pointer hover:border-brand-500/50 hover:-translate-y-1 transition-all">
+                            <div onclick="switchTab('orders')" class="kpi-card cursor-pointer hover:border-brand-500/50 hover:-translate-y-1 transition-all">
                                 <div class="flex justify-between items-start">
                                     <div>
                                         <p class="text-slate-400 text-xs font-medium uppercase tracking-wider">Active Orders</p>
@@ -215,6 +223,16 @@
                                     <span class="text-xs text-slate-400">Instantly update system features</span>
                                 </div>
                                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                    <button onclick="switchTab('app-control')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
+                                        <i class="fa-solid fa-rectangle-ad text-brand-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
+                                        <p class="text-sm font-semibold text-white">Banner Ads</p>
+                                        <p class="text-xs text-slate-400 mt-0.5">Customer Carousel</p>
+                                    </button>
+                                    <button onclick="switchTab('app-control')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
+                                        <i class="fa-solid fa-bolt text-amber-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
+                                        <p class="text-sm font-semibold text-white">Flash Sale</p>
+                                        <p class="text-xs text-slate-400 mt-0.5">Discount Engine</p>
+                                    </button>
                                     <button onclick="openUsersWithFilter('ALL')" class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left transition-all group cursor-pointer">
                                         <i class="fa-solid fa-user-plus text-emerald-400 text-xl mb-2 group-hover:scale-110 transition-transform"></i>
                                         <p class="text-sm font-semibold text-white">Add User</p>
@@ -262,6 +280,152 @@
                         </div>
                     </section>
 
+                    <!-- TAB 2: APP CONTROL CENTER -->
+                    <section id="tab-app-control" class="tab-content hidden space-y-8">
+                        <!-- Banners & Ads -->
+                        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 class="font-bold text-lg text-white">1. Home Carousel Banners & Advertisements</h3>
+                                    <p class="text-xs text-slate-400">Control promotional banners and video advertisements shown in Customer App</p>
+                                </div>
+                                <button onclick="openBannerModal()" class="btn-primary text-xs px-4 py-2 flex items-center gap-2 cursor-pointer">
+                                    <i class="fa-solid fa-plus"></i> Add New Banner
+                                </button>
+                            </div>
+                            <div id="banners-container" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+                        </div>
+
+                        <!-- Flash Sale Engine -->
+                        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 class="font-bold text-lg text-white">2. Flash Sale & Countdown Engine</h3>
+                                    <p class="text-xs text-slate-400">Configure time-limited sales, discounts, and featured flash items</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="toggle-flash-sale" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
+                                    <span class="ml-3 text-xs font-bold text-slate-300">Enable Flash Sale</span>
+                                </label>
+                            </div>
+                            <form id="form-flash-sale" class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 mb-1">Flash Sale Title</label>
+                                    <input type="text" id="fs-title" class="input-field" placeholder="Flash Sale 50% Off">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 mb-1">Discount %</label>
+                                    <input type="number" id="fs-discount" class="input-field" placeholder="50">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 mb-1">Duration (Hours)</label>
+                                    <input type="number" id="fs-hours" class="input-field" placeholder="24">
+                                </div>
+                                <div class="md:col-span-3">
+                                    <button type="submit" class="btn-primary text-xs px-6 py-2.5 cursor-pointer">Save & Launch Flash Sale</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Flash-O Pass Membership Tiers -->
+                        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 class="font-bold text-lg text-white">3. Flash-O Pass Membership Tiers</h3>
+                                    <p class="text-xs text-slate-400">Configure VIP subscription tiers, prices, and free delivery thresholds</p>
+                                </div>
+                            </div>
+                            <div id="pass-tiers-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                        </div>
+
+                        <!-- Popup Broadcast Alert -->
+                        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+                            <h3 class="font-bold text-lg text-white mb-1">4. Customer App Popup Alert Broadcast</h3>
+                            <p class="text-xs text-slate-400 mb-6">Display a prominent pop-up announcement when customers open the app</p>
+
+                            <form id="form-popup-notification" class="space-y-4 max-w-2xl bg-slate-950/60 p-5 rounded-xl border border-slate-800">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <input type="checkbox" id="popup-is-active" class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-brand-600 focus:ring-brand-500">
+                                    <label for="popup-is-active" class="text-sm font-semibold text-white">Active Popup Alert</label>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-400 mb-1">Popup Title</label>
+                                        <input type="text" id="popup-title" class="input-field" placeholder="🎉 Festive Special Offer!">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-400 mb-1">Image URL (Optional)</label>
+                                        <input type="url" id="popup-image" class="input-field" placeholder="https://...">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 mb-1">Popup Message</label>
+                                    <textarea id="popup-message" rows="2" class="input-field" placeholder="Get 50% Cashback on your first 3 orders this week!"></textarea>
+                                </div>
+                                <button type="submit" class="btn-primary text-xs px-6 py-2.5 cursor-pointer">Update Customer App Popup</button>
+                            </form>
+                        </div>
+
+                        <!-- Forced App Update -->
+                        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-6">
+                            <h3 class="font-bold text-lg text-white mb-1">5. Forced App Update Controller</h3>
+                            <p class="text-xs text-slate-400 mb-6">Manage version codes and compel users to update Customer/Partner apps</p>
+
+                            <form id="form-app-update" class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl bg-slate-950/60 p-5 rounded-xl border border-slate-800">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 mb-1">Target App</label>
+                                    <select id="update-target-app" class="input-field">
+                                        <option value="customer">Customer App (com.fryumm)</option>
+                                        <option value="partner">Partner/Delivery App</option>
+                                        <option value="store">F-Store App</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 mb-1">Version Code</label>
+                                    <input type="number" id="update-version-code" class="input-field" placeholder="2">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 mb-1">Version Name</label>
+                                    <input type="text" id="update-version-name" class="input-field" placeholder="1.1.0">
+                                </div>
+                                <!-- Direct APK Upload Box -->
+                                <div class="md:col-span-3 bg-slate-900/90 p-4 rounded-xl border border-slate-800 space-y-3">
+                                    <div class="flex items-center justify-between flex-wrap gap-2">
+                                        <label class="block text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                                            <i class="fa-solid fa-file-arrow-up text-brand-400"></i> Direct Upload APK File (Firebase Storage)
+                                        </label>
+                                        <span id="apk-upload-status" class="text-xs text-slate-400">Select a .apk file to upload directly</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <input type="file" id="apk-file-input" accept=".apk" class="hidden">
+                                        <button type="button" id="btn-trigger-apk-upload" onclick="document.getElementById('apk-file-input').click()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer border border-slate-700">
+                                            <i class="fa-solid fa-folder-open text-amber-400"></i> Choose APK File
+                                        </button>
+                                        <button type="button" id="btn-upload-apk" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                            <i class="fa-solid fa-cloud-arrow-up"></i> Upload to Firebase
+                                        </button>
+                                    </div>
+                                    <!-- Progress Bar -->
+                                    <div id="apk-progress-container" class="w-full bg-slate-800 rounded-full h-2 hidden overflow-hidden">
+                                        <div id="apk-progress-bar" class="bg-brand-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-semibold text-slate-400 mb-1">APK / Play Store Download URL</label>
+                                    <input type="url" id="update-download-url" class="input-field" placeholder="https://firebasestorage.googleapis.com/... or https://play.google.com/...">
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" id="update-is-mandatory" class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-brand-600">
+                                    <label for="update-is-mandatory" class="text-xs font-semibold text-rose-400">Force Update (Mandatory)</label>
+                                </div>
+                                <div class="md:col-span-3">
+                                    <button type="submit" class="btn-primary text-xs px-6 py-2.5 cursor-pointer">Publish App Update Rule</button>
+                                </div>
+                            </form>
+                        </div>
+                    </section>
 
                     <!-- TAB 3: PRODUCTS & CATALOG -->
                     <section id="tab-products" class="tab-content hidden space-y-6">
@@ -646,6 +810,35 @@
         </div>
     </div>
 
+    <!-- MODAL: BANNER -->
+    <div id="modal-banner" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+            <h3 class="text-lg font-bold text-white">Add Carousel Banner</h3>
+            <form id="form-banner" class="space-y-4">
+                <input type="hidden" id="banner-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Title</label>
+                    <input type="text" id="banner-title-input" required class="input-field" placeholder="Snacks Sale 20% Off">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Image URL</label>
+                    <input type="url" id="banner-image-input" required class="input-field" placeholder="https://...">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Action Destination</label>
+                    <input type="text" id="banner-action-input" class="input-field" placeholder="flash_sale">
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="banner-active-input" checked class="w-4 h-4 rounded">
+                    <label for="banner-active-input" class="text-xs font-semibold text-white">Active Banner</label>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="closeBannerModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                    <button type="submit" class="btn-primary text-xs px-5 py-2">Save Banner</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- MODAL: PRODUCT -->
     <div id="modal-product" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
@@ -866,6 +1059,7 @@
             if (pageTitleEl) {
                 const pageTitleMap = {
                     'overview': 'Overview Dashboard',
+                    'app-control': 'App Control Center',
                     'products': 'Product Catalog & Inventory',
                     'orders': 'Live Orders Board',
                     'dark-stores': 'Dark Store Fulfillment Hubs',
@@ -883,11 +1077,6 @@
             }
 
             renderHeaderActions(tabId);
-
-
-            if (tabId === 'orders' && typeof window.filterAndRenderOrders === 'function') {
-                window.filterAndRenderOrders();
-            }
 
             if (tabId === 'dark-stores' && typeof window.renderDarkStoresGrid === 'function') {
                 window.renderDarkStoresGrid();
@@ -923,22 +1112,21 @@
                     </button>
                 `;
             } else if (tabId === 'orders') {
-                const currentFilter = window.activeStatusFilter || 'ALL';
                 container.innerHTML = `
                     <div class="relative w-32 sm:w-48 lg:w-60 shrink">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
-                        <input type="text" id="search-order-input" oninput="window.handleOrderSearch ? window.handleOrderSearch(this.value) : null" placeholder="Search orders..." class="input-field pl-8 py-1.5 text-xs w-full bg-slate-950/90 border-slate-700/80 rounded-xl">
+                        <input type="text" id="search-order-input" placeholder="Search orders..." class="input-field pl-8 py-1.5 text-xs w-full bg-slate-950/90 border-slate-700/80 rounded-xl">
                     </div>
-                    <select id="filter-order-status" onchange="window.handleOrderStatusFilter ? window.handleOrderStatusFilter(this.value) : null" class="input-field text-xs py-1.5 px-2 bg-slate-950 border-slate-700 rounded-xl w-auto">
-                        <option value="ALL" ${currentFilter === 'ALL' ? 'selected' : ''}>All Orders</option>
-                        <option value="ACTIVE" ${currentFilter === 'ACTIVE' ? 'selected' : ''}>Active</option>
-                        <option value="PLACED" ${currentFilter === 'PLACED' ? 'selected' : ''}>PLACED</option>
-                        <option value="ACCEPTED" ${currentFilter === 'ACCEPTED' ? 'selected' : ''}>ACCEPTED</option>
-                        <option value="PREPARING" ${currentFilter === 'PREPARING' ? 'selected' : ''}>PREPARING</option>
-                        <option value="READY" ${currentFilter === 'READY' ? 'selected' : ''}>READY</option>
-                        <option value="DISPATCHED" ${currentFilter === 'DISPATCHED' ? 'selected' : ''}>DISPATCHED</option>
-                        <option value="DELIVERED" ${currentFilter === 'DELIVERED' ? 'selected' : ''}>DELIVERED</option>
-                        <option value="CANCELLED" ${currentFilter === 'CANCELLED' ? 'selected' : ''}>CANCELLED</option>
+                    <select id="filter-order-status" class="input-field text-xs py-1.5 px-2 bg-slate-950 border-slate-700 rounded-xl w-auto">
+                        <option value="ALL" selected>All Orders</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="PLACED">PLACED</option>
+                        <option value="ACCEPTED">ACCEPTED</option>
+                        <option value="PREPARING">PREPARING</option>
+                        <option value="READY">READY</option>
+                        <option value="DISPATCHED">DISPATCHED</option>
+                        <option value="DELIVERED">DELIVERED</option>
+                        <option value="CANCELLED">CANCELLED</option>
                     </select>
                     <button onclick="exportOrdersCsv()" title="Export Orders CSV" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-slate-700 flex items-center justify-center cursor-pointer transition-colors shrink-0">
                         <i class="fa-solid fa-file-csv text-xs sm:text-sm"></i>
@@ -1024,6 +1212,7 @@
     <script type="module" src="js/darkstores.js"></script>
     <script type="module" src="js/riders.js"></script>
     <script type="module" src="js/coupons.js"></script>
+    <script type="module" src="js/app-control.js"></script>
     <script type="module" src="js/analytics.js"></script>
     <script type="module" src="js/notifications.js"></script>
     <script type="module" src="js/map.js"></script>

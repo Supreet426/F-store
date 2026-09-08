@@ -41,6 +41,7 @@ export function switchTab(tabId, isBackAction = false) {
         'overview': 'Dashboard Overview',
         'merchant-home': 'Merchant Store Partner Portal',
         'user-profile': 'User Profile Details & Governance',
+        'app-control': 'App Control Center',
         'products': 'Product Catalog & Inventory',
         'orders': 'Live Orders Board',
         'dark-stores': 'Dark Store Fulfillment Hubs',
@@ -58,7 +59,6 @@ export function switchTab(tabId, isBackAction = false) {
     }
 
     renderHeaderActions(tabId);
-
 
     if (tabId === 'dark-stores' && typeof window.renderDarkStoresGrid === 'function') {
         window.renderDarkStoresGrid();
@@ -99,22 +99,21 @@ export function renderHeaderActions(tabId) {
             </button>
         `;
     } else if (tabId === 'orders') {
-        const currentFilter = window.activeStatusFilter || 'ALL';
         container.innerHTML = `
             <div class="relative w-32 sm:w-48 lg:w-60 shrink">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
-                <input type="text" id="search-order-input" oninput="window.handleOrderSearch ? window.handleOrderSearch(this.value) : null" placeholder="Search orders..." class="input-field pl-8 py-1.5 text-xs w-full bg-slate-950/90 border-slate-700/80 rounded-xl">
+                <input type="text" id="search-order-input" placeholder="Search orders..." class="input-field pl-8 py-1.5 text-xs w-full bg-slate-950/90 border-slate-700/80 rounded-xl">
             </div>
-            <select id="filter-order-status" onchange="window.handleOrderStatusFilter ? window.handleOrderStatusFilter(this.value) : null" class="input-field text-xs py-1.5 px-2 bg-slate-950 border-slate-700 rounded-xl w-auto">
-                <option value="ALL" ${currentFilter === 'ALL' ? 'selected' : ''}>All Orders</option>
-                <option value="ACTIVE" ${currentFilter === 'ACTIVE' ? 'selected' : ''}>Active</option>
-                <option value="PLACED" ${currentFilter === 'PLACED' ? 'selected' : ''}>PLACED</option>
-                <option value="ACCEPTED" ${currentFilter === 'ACCEPTED' ? 'selected' : ''}>ACCEPTED</option>
-                <option value="PREPARING" ${currentFilter === 'PREPARING' ? 'selected' : ''}>PREPARING</option>
-                <option value="READY" ${currentFilter === 'READY' ? 'selected' : ''}>READY</option>
-                <option value="DISPATCHED" ${currentFilter === 'DISPATCHED' ? 'selected' : ''}>DISPATCHED</option>
-                <option value="DELIVERED" ${currentFilter === 'DELIVERED' ? 'selected' : ''}>DELIVERED</option>
-                <option value="CANCELLED" ${currentFilter === 'CANCELLED' ? 'selected' : ''}>CANCELLED</option>
+            <select id="filter-order-status" class="input-field text-xs py-1.5 px-2 bg-slate-950 border-slate-700 rounded-xl w-auto">
+                <option value="ALL" selected>All Orders</option>
+                <option value="ACTIVE">Active</option>
+                <option value="PLACED">PLACED</option>
+                <option value="ACCEPTED">ACCEPTED</option>
+                <option value="PREPARING">PREPARING</option>
+                <option value="READY">READY</option>
+                <option value="DISPATCHED">DISPATCHED</option>
+                <option value="DELIVERED">DELIVERED</option>
+                <option value="CANCELLED">CANCELLED</option>
             </select>
             <button onclick="exportOrdersCsv()" title="Export Orders CSV" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-slate-700 flex items-center justify-center cursor-pointer transition-colors shrink-0">
                 <i class="fa-solid fa-file-csv text-xs sm:text-sm"></i>
@@ -204,20 +203,3 @@ export function showToast(message, type = 'success') {
     }, 4000);
 }
 window.showToast = showToast;
-
-// Close drawer when clicking outside (mobile and desktop)
-document.addEventListener('click', (event) => {
-    const sidebar = document.getElementById('sidebar-drawer');
-    const toggleBtn = document.getElementById('btn-toggle-drawer');
-    if (!sidebar) return;
-
-    const isOpen = !sidebar.classList.contains('-translate-x-full');
-    if (!isOpen) return;
-
-    if (sidebar.contains(event.target) || (toggleBtn && toggleBtn.contains(event.target))) {
-        return;
-    }
-
-    toggleDrawer(false);
-});
-

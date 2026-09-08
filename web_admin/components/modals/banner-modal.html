@@ -1,0 +1,28 @@
+<div id="modal-banner" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+        <h3 class="text-lg font-bold text-white">Add Carousel Banner</h3>
+        <form id="form-banner" class="space-y-4">
+            <input type="hidden" id="banner-id">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="banner-title-input">Title</label>
+                <input type="text" id="banner-title-input" required class="input-field" placeholder="Snacks Sale 20% Off">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="banner-image-input">Image URL</label>
+                <input type="url" id="banner-image-input" required class="input-field" placeholder="https://...">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="banner-action-input">Action Destination</label>
+                <input type="text" id="banner-action-input" class="input-field" placeholder="flash_sale">
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="banner-active-input" checked class="w-4 h-4 rounded">
+                <label for="banner-active-input" class="text-xs font-semibold text-white">Active Banner</label>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button" onclick="closeBannerModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                <button type="submit" class="btn-primary text-xs px-5 py-2">Save Banner</button>
+            </div>
+        </form>
+    </div>
+</div>
