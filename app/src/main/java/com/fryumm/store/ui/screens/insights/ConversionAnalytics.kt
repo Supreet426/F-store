@@ -207,7 +207,7 @@ fun LocalFunnelStepRow(index: Int, step: FunnelStep, allSteps: List<FunnelStep>)
                     Text("${step.count}", fontSize = 12.sp, fontWeight = FontWeight.Black)
                 }
                 LinearProgressIndicator(
-                    progress = { step.percentage / 100f },
+                    progress = { (step.percentage / 100.0).toFloat() },
                     modifier = Modifier.fillMaxWidth().height(6.dp),
                     color = if (index == allSteps.size - 1) Color(0xFF4CAF50) else FStorePurple,
                     trackColor = Color.LightGray.copy(alpha = 0.2f),

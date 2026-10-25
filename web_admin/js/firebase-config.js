@@ -3,6 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getStorage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyA5TLXs7Nmdl9Qp27v7l0Brog2pMdD_3a4",
@@ -18,7 +19,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+const functions = getFunctions(app);
 
-console.log("🔥 Firebase initialized for project fryumm-5c865");
+console.log("🔥 Firebase & Cloud Functions initialized for project fryumm-5c865");
 
-export { app, auth, db, storage, firebaseConfig };
+export { app, auth, db, storage, functions, httpsCallable, firebaseConfig };

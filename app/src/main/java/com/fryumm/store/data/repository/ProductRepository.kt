@@ -1,111 +1,244 @@
 package com.fryumm.store.data.repository
 
-import android.util.Log
 import com.fryumm.store.data.model.Product
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.channels.awaitClose
+import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.functions.HttpsCallableResult
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ProductRepository @Inject constructor(
-    private val firestore: FirebaseFirestore
-) {
-    private val productsCollection = firestore.collection("products")
+class ProductRepository @Inject constructor() {
+    private val firestore = FirebaseFirestore.getInstance()
+    private val functions = FirebaseFunctions.getInstance()
+    private val auth = FirebaseAuth.getInstance()
 
-    fun getProducts(): Flow<List<Product>> = callbackFlow {
-        val subscription = productsCollection.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                Log.e("StoreRepository", "Error fetching products", error)
-                trySend(emptyList()) // Send empty list instead of closing with error
-                return@addSnapshotListener
-            }
-            val products = snapshot?.documents?.mapNotNull { doc ->
-                try {
-                    doc.toObject(Product::class.java)?.copy(id = doc.id)
-                } catch (e: Exception) {
-                    Log.e("StoreRepository", "Parsing error for ${doc.id}", e)
-                    null
-                }
-            } ?: emptyList()
-            Log.d("StoreRepository", "Read ${products.size} products from Firestore with IDs")
-            trySend(products)
-        }
-        awaitClose { subscription.remove() }
-    }
-
-    suspend fun addProduct(product: Product): Result<Unit> {
-        return try {
-            val docRef = if (product.id.isEmpty()) {
-                productsCollection.document()
-            } else {
-                productsCollection.document(product.id)
-            }
-            val finalProduct = product.copy(id = docRef.id)
-            Log.d("StoreRepository", "Attempting to write product: ${product.name}")
-            docRef.set(finalProduct).await()
-            Log.d("StoreRepository", "SUCCESS: Product written to Firestore")
-            Result.success(Unit)
+    // Read products from private or public catalog
+    fun getProducts(usePublicCatalog: Boolean = false): Flow<Result<List<Product>>> = flow {
+        try {
+            val collectionName = if (usePublicCatalog) "public_products" else "products"
+            val snapshot = firestore.collection(collectionName).get().await()
+            val products = snapshot.toObjects(Product::class.java)
+            emit(Result.success(products))
         } catch (e: Exception) {
-            Log.e("StoreRepository", "FAILED to write product", e)
-            Result.failure(e)
+            emit(Result.failure(e))
         }
     }
 
-    suspend fun updateProduct(product: Product): Result<Unit> {
+    suspend fun getProductById(productId: String, usePublicCatalog: Boolean = false): Result<Product?> {
         return try {
-            productsCollection.document(product.id).set(product).await()
-            Result.success(Unit)
+            val collectionName = if (usePublicCatalog) "public_products" else "products"
+            val snapshot = firestore.collection(collectionName).document(productId).get().await()
+            Result.success(snapshot.toObject(Product::class.java))
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    suspend fun deleteProduct(productId: String): Result<Unit> {
+    // Call Cloud Function: createProductDraft
+    suspend fun addProduct(product: Product, merchantId: String? = null, darkStoreId: String? = null): Result<String> {
         return try {
-            productsCollection.document(productId).delete().await()
-            Result.success(Unit)
+            val currentUid = auth.currentUser?.uid
+            val effectiveMerchantId = merchantId ?: product.merchantId ?: (if (product.darkStoreId == null) currentUid else null)
+            val effectiveDarkStoreId = darkStoreId ?: product.darkStoreId
+
+            val payload = hashMapOf<String, Any?>(
+                "merchantId" to effectiveMerchantId,
+                "darkStoreId" to effectiveDarkStoreId,
+                "productData" to hashMapOf(
+                    "name" to product.name,
+                    "brand" to product.brand,
+                    "description" to product.description,
+                    "shortDescription" to product.shortDescription,
+                    "price" to product.price,
+                    "originalPrice" to product.originalPrice,
+                    "imageUrl" to product.imageUrl,
+                    "images" to product.images,
+                    "category" to product.category,
+                    "subCategory" to product.subCategory,
+                    "stockQuantity" to product.stockQuantity,
+                    "isInStock" to product.isInStock,
+                    "aisle" to product.aisle,
+                    "rack" to product.rack,
+                    "barcode" to product.barcode,
+                    "hsnCode" to product.hsnCode,
+                    "taxRate" to product.taxRate,
+                    "unit" to product.unit,
+                    "weight" to product.weight,
+                    "basePrice" to product.basePrice,
+                    "merchantRate" to product.merchantRate,
+                    "discountValue" to product.discountValue,
+                    "legalDisclaimer" to product.legalDisclaimer,
+                    "fssaiNumber" to product.fssaiNumber,
+                    "isFoodProduct" to product.isFoodProduct,
+                    "minOrderQuantity" to product.minOrderQuantity,
+                    "isPreorderEnabled" to product.isPreorderEnabled,
+                    "maxPreorderCapacity" to product.maxPreorderCapacity,
+                    "preorderStart" to product.preorderStart,
+                    "preorderEnd" to product.preorderEnd,
+                ),
+            )
+
+            val result: HttpsCallableResult = functions
+                .getHttpsCallable("createProductDraft")
+                .call(payload)
+                .await()
+
+            @Suppress("UNCHECKED_CAST")
+            val dataMap = result.data as? Map<String, Any?>
+            val createdId = (dataMap?.get("productId") as? String) ?: ""
+            Result.success(createdId)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    suspend fun reserveStock(productId: String, variantId: String?, quantity: Int): Result<Unit> {
+    // Call Cloud Function: updateProductDraft
+    suspend fun updateProduct(productId: String, updateData: Map<String, Any?>): Result<Boolean> {
         return try {
-            firestore.runTransaction { transaction ->
-                val docRef = productsCollection.document(productId)
-                val snapshot = transaction.get(docRef)
-                val product = snapshot.toObject(Product::class.java)
-                    ?: throw IllegalStateException("Product not found")
-
-                if (variantId.isNullOrEmpty()) {
-                    val currentStock = product.stockQuantity
-                    if (currentStock < quantity) {
-                        throw IllegalStateException("Insufficient stock for ${product.name}")
-                    }
-                    val newStock = currentStock - quantity
-                    transaction.update(docRef, mapOf(
-                        "stockQuantity" to newStock,
-                        "isInStock" to (newStock > 0)
-                    ))
-                } else {
-                    val updatedVariants = product.variants.map { variant ->
-                        if (variant.id == variantId) {
-                            if (variant.stockQuantity < quantity) {
-                                throw IllegalStateException("Insufficient stock for variant ${variant.title}")
-                            }
-                            variant.copy(stockQuantity = variant.stockQuantity - quantity)
-                        } else variant
-                    }
-                    transaction.update(docRef, "variants", updatedVariants)
-                }
-            }.await()
-            Result.success(Unit)
+            val payload = hashMapOf(
+                "productId" to productId,
+                "updateData" to updateData,
+            )
+            functions.getHttpsCallable("updateProductDraft").call(payload).await()
+            Result.success(true)
         } catch (e: Exception) {
-            Log.e("ProductRepository", "Stock reservation failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateProduct(product: Product): Result<Boolean> {
+        return updateProduct(
+            productId = product.id,
+            updateData = mapOf(
+                "name" to product.name,
+                "brand" to product.brand,
+                "description" to product.description,
+                "shortDescription" to product.shortDescription,
+                "price" to product.price,
+                "originalPrice" to product.originalPrice,
+                "imageUrl" to product.imageUrl,
+                "images" to product.images,
+                "category" to product.category,
+                "subCategory" to product.subCategory,
+                "stockQuantity" to product.stockQuantity,
+                "isInStock" to product.isInStock,
+                "isAvailable" to product.isAvailable,
+                "aisle" to product.aisle,
+                "rack" to product.rack,
+                "barcode" to product.barcode,
+                "hsnCode" to product.hsnCode,
+                "taxRate" to product.taxRate,
+                "unit" to product.unit,
+                "weight" to product.weight,
+                "basePrice" to product.basePrice,
+                "merchantRate" to product.merchantRate,
+                "discountValue" to product.discountValue,
+                "legalDisclaimer" to product.legalDisclaimer,
+                "fssaiNumber" to product.fssaiNumber,
+                "isFoodProduct" to product.isFoodProduct,
+                "minOrderQuantity" to product.minOrderQuantity,
+                "isPreorderEnabled" to product.isPreorderEnabled,
+                "maxPreorderCapacity" to product.maxPreorderCapacity,
+                "preorderStart" to product.preorderStart,
+                "preorderEnd" to product.preorderEnd,
+            )
+        )
+    }
+
+    suspend fun deleteProduct(productId: String): Result<Boolean> {
+        return updateProduct(
+            productId = productId,
+            updateData = mapOf(
+                "publishingStatus" to "ARCHIVED",
+                "isAvailable" to false,
+                "isInStock" to false
+            )
+        )
+    }
+
+    // Call Cloud Function: reviewProductDepartment
+    suspend fun reviewProductDepartment(productId: String, department: String, approved: Boolean): Result<Boolean> {
+        return try {
+            val payload = hashMapOf(
+                "productId" to productId,
+                "department" to department,
+                "approved" to approved,
+            )
+            functions.getHttpsCallable("reviewProductDepartment").call(payload).await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Call Cloud Function: grantFinalApproval
+    suspend fun grantFinalApproval(productId: String, commissionRate: Double? = null, taxRate: Double? = null): Result<Boolean> {
+        return try {
+            val payload = hashMapOf<String, Any?>(
+                "productId" to productId,
+                "commissionRate" to commissionRate,
+                "taxRate" to taxRate,
+            )
+            functions.getHttpsCallable("grantFinalApproval").call(payload).await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Call Cloud Function: grantAdminOverride
+    suspend fun grantAdminOverride(productId: String, overrideReason: String): Result<Boolean> {
+        return try {
+            val payload = hashMapOf(
+                "productId" to productId,
+                "overrideReason" to overrideReason,
+            )
+            functions.getHttpsCallable("grantAdminOverride").call(payload).await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Call Cloud Function: publishProduct
+    suspend fun publishProduct(productId: String): Result<Boolean> {
+        return try {
+            val payload = hashMapOf("productId" to productId)
+            functions.getHttpsCallable("publishProduct").call(payload).await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Call Cloud Function: reservePreorderItem
+    suspend fun reservePreorderItem(productId: String, quantity: Int = 1, idempotencyKey: String = UUID.randomUUID().toString()): Result<Boolean> {
+        return try {
+            val payload = hashMapOf(
+                "productId" to productId,
+                "quantity" to quantity,
+                "idempotencyKey" to idempotencyKey,
+            )
+            functions.getHttpsCallable("reservePreorderItem").call(payload).await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Call Cloud Function: cancelPreorderReservation
+    suspend fun cancelPreorderReservation(reservationId: String): Result<Boolean> {
+        return try {
+            val payload = hashMapOf("reservationId" to reservationId)
+            functions.getHttpsCallable("cancelPreorderReservation").call(payload).await()
+            Result.success(true)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

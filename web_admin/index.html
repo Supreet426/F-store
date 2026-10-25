@@ -61,7 +61,7 @@
                     <i class="fa-solid fa-bolt text-xs text-white"></i>
                 </div>
                 <div class="h-4 w-px bg-slate-800 hidden sm:block shrink-0"></div>
-                <h2 id="page-title" class="text-sm sm:text-base font-black text-white tracking-wide truncate max-w-[180px] sm:max-w-none">Product Catalog & Inventory</h2>
+                <h2 id="page-title" class="text-sm sm:text-base font-black text-white tracking-wide truncate max-w-[180px] sm:max-w-none">Product Catalog</h2>
             </div>
 
             <!-- Center/Actions Section: SHIFTED ALL TAB ACTION BUTTONS DIRECTLY TO TITLE BAR -->
@@ -90,26 +90,31 @@
                     </div>
 
                     <nav class="p-3 space-y-1">
+                        <div class="px-3 pt-2 pb-1 text-[10px] font-extrabold text-brand-400 uppercase tracking-wider">Main Operations</div>
                         <button data-tab="overview" class="nav-btn active">
                             <i class="fa-solid fa-chart-pie w-5"></i> Overview
                         </button>
-                        <button data-tab="app-control" class="nav-btn">
-                            <i class="fa-solid fa-sliders w-5"></i> App Control Center
-                        </button>
-                        <button data-tab="products" class="nav-btn">
-                            <i class="fa-solid fa-box-open w-5"></i> Products & Catalog
+                        <button data-tab="merchant-home" class="nav-btn">
+                            <i class="fa-solid fa-house-user w-5 text-amber-400"></i> Merchant Home
                         </button>
                         <button data-tab="orders" class="nav-btn">
                             <i class="fa-solid fa-receipt w-5"></i> Live Orders
                             <span id="badge-live-orders" class="ml-auto bg-brand-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
                         </button>
+                        <button data-tab="products" class="nav-btn">
+                            <i class="fa-solid fa-box-open w-5"></i> Products & Catalog
+                        </button>
                         <button data-tab="dark-stores" class="nav-btn">
                             <i class="fa-solid fa-store w-5"></i> Dark Store Hubs
                         </button>
-                        <button data-tab="notifications" class="nav-btn">
-                            <i class="fa-solid fa-bell w-5 text-amber-400"></i> Notifications Center
+                        <button data-tab="riders" class="nav-btn">
+                            <i class="fa-solid fa-motorcycle w-5"></i> Fleet & Dispatch
                         </button>
 
+                        <div class="px-3 pt-3 pb-1 text-[10px] font-extrabold text-brand-400 uppercase tracking-wider">Control & Analytics</div>
+                        <button data-tab="app-control" class="nav-btn">
+                            <i class="fa-solid fa-sliders w-5"></i> App Control Center
+                        </button>
                         <button data-tab="users" class="nav-btn">
                             <i class="fa-solid fa-users w-5"></i> User Management
                         </button>
@@ -121,6 +126,11 @@
                         </button>
                         <button data-tab="map" class="nav-btn">
                             <i class="fa-solid fa-map-location-dot w-5"></i> Live Operations Map
+                        </button>
+
+                        <div class="px-3 pt-3 pb-1 text-[10px] font-extrabold text-brand-400 uppercase tracking-wider">Communication & Config</div>
+                        <button data-tab="notifications" class="nav-btn">
+                            <i class="fa-solid fa-bell w-5 text-amber-400"></i> Notifications Center
                         </button>
                         <button data-tab="live-support" class="nav-btn">
                             <i class="fa-solid fa-headset w-5 text-emerald-400"></i> Live Support Chat
@@ -1060,7 +1070,7 @@
                 const pageTitleMap = {
                     'overview': 'Overview Dashboard',
                     'app-control': 'App Control Center',
-                    'products': 'Product Catalog & Inventory',
+                    'products': 'Product Catalog',
                     'orders': 'Live Orders Board',
                     'dark-stores': 'Dark Store Fulfillment Hubs',
                     'riders': 'Delivery Partners Hub',

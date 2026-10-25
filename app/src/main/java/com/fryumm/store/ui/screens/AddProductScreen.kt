@@ -409,9 +409,10 @@ fun AddProductScreen(
                             specifications = specifications,
                             isVerified = isAdmin,
                             adminFeedback = adminFeedback,
-                            addedAt = productToEdit?.addedAt ?: System.currentTimeMillis(),
-                            sellerId = productToEdit?.sellerId ?: viewModel.currentUserProfile?.uid ?: "seller_1",
-                            sellerName = productToEdit?.sellerName ?: viewModel.currentUserProfile?.name ?: "Flash-O Seller",
+                            merchantId = productToEdit?.merchantId ?: viewModel.currentUserProfile?.uid ?: "merchant_1",
+                            merchantName = productToEdit?.merchantName ?: viewModel.currentUserProfile?.name ?: "Flash-O Merchant",
+                            darkStoreId = productToEdit?.darkStoreId,
+                            darkHubId = productToEdit?.darkHubId ?: "",
                             variants = variants
                         )
 

@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.fryumm.store.data.model.DynamicAppConfig
 import com.fryumm.store.data.model.Product
 import com.fryumm.store.data.model.UserProfile
 import com.fryumm.store.data.model.UserRole
@@ -16,13 +15,11 @@ import com.fryumm.store.data.repository.NotificationRepository
 import com.fryumm.store.data.repository.ProductRepository
 import com.fryumm.store.data.repository.StorageRepository
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import javax.inject.Inject
 
@@ -32,8 +29,7 @@ class ProductViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val storageRepository: StorageRepository,
     private val notificationRepository: NotificationRepository,
-    private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val auth: FirebaseAuth
 ) : AndroidViewModel(application) {
 
     sealed class UiEvent {
@@ -55,9 +51,13 @@ class ProductViewModel @Inject constructor(
 
     private fun observeProducts() {
         viewModelScope.launch {
-            productRepository.getProducts().collect { list ->
-                rawProducts = list
-                filterProducts(null)
+            productRepository.getProducts().collect { result ->
+                result.onSuccess { list ->
+                    rawProducts = list
+                    filterProducts(null)
+                }.onFailure { e ->
+                    Log.e("ProductViewModel", "Error reading products", e)
+                }
             }
         }
     }
@@ -73,7 +73,7 @@ class ProductViewModel @Inject constructor(
         products = if (isAdmin) {
             rawProducts
         } else {
-            rawProducts.filter { it.sellerId == profile.uid }
+            rawProducts.filter { it.merchantId == profile.uid }
         }.sortedBy { it.sequenceNumber }
     }
 
@@ -85,25 +85,29 @@ class ProductViewModel @Inject constructor(
         masterAdmins: List<String>
     ) {
         val isAdmin = isMasterAdmin || currentUserProfile?.userRole == UserRole.ADMIN
-        val finalProduct = product.copy(
-            isVerified = isAdmin,
-            isAvailable = isAdmin
-        )
-        viewModelScope.launch {
-            productRepository.addProduct(finalProduct)
-            if (!isAdmin) {
-                _uiEvent.emit(UiEvent.ShowError("Product submitted. It will be live after Admin verification."))
+        val merchantId = currentUserProfile?.uid
 
-                allUsers.filter { user ->
-                    user.userRole == UserRole.ADMIN || masterAdmins.contains(user.email.lowercase().trim())
-                }.forEach { admin ->
-                    notificationRepository.sendNotification(
-                        userId = admin.uid,
-                        title = "New Product Approval Request",
-                        body = "${currentUserProfile?.name ?: "Merchant"} added '${product.name}'. Please review.",
-                        actionUrl = "stores"
-                    )
+        viewModelScope.launch {
+            val result = productRepository.addProduct(product, merchantId = merchantId)
+            result.onSuccess { createdId ->
+                if (!isAdmin) {
+                    _uiEvent.emit(UiEvent.ShowError("Product submitted. It will be live after Admin verification."))
+
+                    allUsers.filter { user ->
+                        user.userRole == UserRole.ADMIN || masterAdmins.contains(user.email.lowercase().trim())
+                    }.forEach { admin ->
+                        notificationRepository.sendNotification(
+                            userId = admin.uid,
+                            title = "New Product Approval Request",
+                            body = "${currentUserProfile?.name ?: "Merchant"} added '${product.name}'. Please review.",
+                            actionUrl = "stores"
+                        )
+                    }
+                } else {
+                    _uiEvent.emit(UiEvent.ShowSuccess("Product draft created successfully! (ID: $createdId)"))
                 }
+            }.onFailure { e ->
+                _uiEvent.emit(UiEvent.ShowError("Failed to create product: ${e.message}"))
             }
         }
     }
@@ -117,40 +121,45 @@ class ProductViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             try {
-                val existing = rawProducts.find { it.id == product.id }
-                val isPriceAffected = existing != null && (
-                    existing.basePrice != product.basePrice ||
-                    existing.price != product.price ||
-                    existing.deliveryCharge != product.deliveryCharge ||
-                    existing.freeDeliveryMinAmount != product.freeDeliveryMinAmount ||
-                    existing.freeDeliveryMinQuantity != product.freeDeliveryMinQuantity ||
-                    existing.minOrderQuantity != product.minOrderQuantity ||
-                    existing.taxRate != product.taxRate ||
-                    existing.cgstRate != product.cgstRate ||
-                    existing.sgstRate != product.sgstRate
+                val updateData = mapOf(
+                    "name" to product.name,
+                    "brand" to product.brand,
+                    "description" to product.description,
+                    "shortDescription" to product.shortDescription,
+                    "price" to product.price,
+                    "originalPrice" to product.originalPrice,
+                    "imageUrl" to product.imageUrl,
+                    "images" to product.images,
+                    "category" to product.category,
+                    "subCategory" to product.subCategory,
+                    "stockQuantity" to product.stockQuantity,
+                    "isInStock" to product.isInStock,
+                    "isAvailable" to product.isAvailable,
+                    "aisle" to product.aisle,
+                    "rack" to product.rack,
+                    "barcode" to product.barcode,
+                    "hsnCode" to product.hsnCode,
+                    "taxRate" to product.taxRate,
+                    "unit" to product.unit,
+                    "weight" to product.weight,
+                    "basePrice" to product.basePrice,
+                    "merchantRate" to product.merchantRate,
+                    "discountValue" to product.discountValue,
+                    "legalDisclaimer" to product.legalDisclaimer,
+                    "fssaiNumber" to product.fssaiNumber,
+                    "isFoodProduct" to product.isFoodProduct,
+                    "minOrderQuantity" to product.minOrderQuantity,
+                    "isPreorderEnabled" to product.isPreorderEnabled,
+                    "maxPreorderCapacity" to product.maxPreorderCapacity,
+                    "preorderStart" to product.preorderStart,
+                    "preorderEnd" to product.preorderEnd
                 )
 
-                val updatedProduct = if (isPriceAffected && !isMasterAdmin && currentUserProfile?.userRole != UserRole.ADMIN) {
-                    allUsers.filter { user ->
-                        user.userRole == UserRole.ADMIN || masterAdmins.contains(user.email.lowercase().trim())
-                    }.forEach { admin ->
-                        notificationRepository.sendNotification(
-                            userId = admin.uid,
-                            title = "Product Price Update: Re-verification Needed",
-                            body = "${currentUserProfile?.name ?: "Merchant"} updated '${product.name}'. Please re-approve.",
-                            actionUrl = "stores"
-                        )
-                    }
-                    product.copy(isVerified = false, isAvailable = false)
-                } else {
-                    product.copy(isInStock = product.stockQuantity > 0)
-                }
-                productRepository.updateProduct(updatedProduct)
-
-                if (isPriceAffected && !isMasterAdmin && currentUserProfile?.userRole != UserRole.ADMIN) {
-                    _uiEvent.emit(UiEvent.ShowError("Price changed. Product hidden until Admin re-verifies."))
-                } else {
-                    _uiEvent.emit(UiEvent.ShowSuccess("Product updated successfully!"))
+                val result = productRepository.updateProduct(product.id, updateData)
+                result.onSuccess {
+                    _uiEvent.emit(UiEvent.ShowSuccess("Product draft updated successfully!"))
+                }.onFailure { e ->
+                    _uiEvent.emit(UiEvent.ShowError("Failed to update product: ${e.message}"))
                 }
             } catch (e: Exception) {
                 _uiEvent.emit(UiEvent.ShowError("Failed to update product: ${e.message}"))
@@ -160,34 +169,39 @@ class ProductViewModel @Inject constructor(
 
     fun updateProductSequence(productId: String, newSequence: Int) {
         viewModelScope.launch {
-            try {
-                firestore.collection("products").document(productId)
-                    .update("sequenceNumber", newSequence).await()
+            val result = productRepository.updateProduct(productId, mapOf("sequenceNumber" to newSequence))
+            result.onSuccess {
                 _uiEvent.emit(UiEvent.ShowSuccess("Sequence updated"))
-            } catch (e: Exception) {
-                _uiEvent.emit(UiEvent.ShowError("Failed to update sequence"))
+            }.onFailure { e ->
+                _uiEvent.emit(UiEvent.ShowError("Failed to update sequence: ${e.message}"))
             }
         }
     }
 
     fun bulkUpdateProductSequences(updatedProducts: List<Product>) {
         viewModelScope.launch {
-            try {
-                val batch = firestore.batch()
-                updatedProducts.forEach { product ->
-                    val docRef = firestore.collection("products").document(product.id)
-                    batch.update(docRef, "sequenceNumber", product.sequenceNumber)
-                }
-                batch.commit().await()
-                _uiEvent.emit(UiEvent.ShowSuccess("All product sequences saved"))
-            } catch (e: Exception) {
-                _uiEvent.emit(UiEvent.ShowError("Failed to update product sequences: ${e.message}"))
+            var successCount = 0
+            updatedProducts.forEach { product ->
+                val res = productRepository.updateProduct(product.id, mapOf("sequenceNumber" to product.sequenceNumber))
+                if (res.isSuccess) successCount++
+            }
+            if (successCount > 0) {
+                _uiEvent.emit(UiEvent.ShowSuccess("Saved sequence for $successCount products"))
+            } else {
+                _uiEvent.emit(UiEvent.ShowError("Failed to update product sequences"))
             }
         }
     }
 
-    fun deleteProduct(productId: String) {
-        viewModelScope.launch { productRepository.deleteProduct(productId) }
+    fun reviewProductDepartment(productId: String, department: String, approved: Boolean) {
+        viewModelScope.launch {
+            val result = productRepository.reviewProductDepartment(productId, department, approved)
+            result.onSuccess {
+                _uiEvent.emit(UiEvent.ShowSuccess("Department '$department' review recorded."))
+            }.onFailure { e ->
+                _uiEvent.emit(UiEvent.ShowError("Department review failed: ${e.message}"))
+            }
+        }
     }
 
     fun approveProduct(
@@ -198,25 +212,38 @@ class ProductViewModel @Inject constructor(
         gstRate: Double
     ) {
         viewModelScope.launch {
-            try {
-                firestore.collection("products").document(productId).update(
-                    mapOf(
-                        "isVerified" to true,
-                        "isAvailable" to true,
-                        "verifiedBy" to (auth.currentUser?.uid ?: "admin"),
-                        "verificationDate" to System.currentTimeMillis(),
-                        "commissionRate" to commission,
-                        "adminProfitPercent" to profitPercent,
-                        "deliveryCharge" to deliveryCharge,
-                        "taxRate" to gstRate,
-                        "cgstRate" to gstRate / 2.0,
-                        "sgstRate" to gstRate / 2.0
-                    )
-                ).await()
-                _uiEvent.emit(UiEvent.ShowSuccess("Product Approved with configured margins"))
-            } catch (e: Exception) {
+            val result = productRepository.grantFinalApproval(
+                productId = productId,
+                commissionRate = commission,
+                taxRate = gstRate
+            )
+            result.onSuccess {
+                _uiEvent.emit(UiEvent.ShowSuccess("Product Final Approval Granted"))
+            }.onFailure { e ->
                 Log.e("ProductViewModel", "Failed to approve product", e)
-                _uiEvent.emit(UiEvent.ShowError("Approval Failed"))
+                _uiEvent.emit(UiEvent.ShowError("Approval Failed: ${e.message}"))
+            }
+        }
+    }
+
+    fun grantAdminOverride(productId: String, overrideReason: String) {
+        viewModelScope.launch {
+            val result = productRepository.grantAdminOverride(productId, overrideReason)
+            result.onSuccess {
+                _uiEvent.emit(UiEvent.ShowSuccess("Master Admin Override Granted! Product is LIVE."))
+            }.onFailure { e ->
+                _uiEvent.emit(UiEvent.ShowError("Admin Override Failed: ${e.message}"))
+            }
+        }
+    }
+
+    fun publishProduct(productId: String) {
+        viewModelScope.launch {
+            val result = productRepository.publishProduct(productId)
+            result.onSuccess {
+                _uiEvent.emit(UiEvent.ShowSuccess("Product published successfully to catalog!"))
+            }.onFailure { e ->
+                _uiEvent.emit(UiEvent.ShowError("Publish Failed: ${e.message}"))
             }
         }
     }
@@ -224,49 +251,40 @@ class ProductViewModel @Inject constructor(
     fun approveAllProducts(currentUserProfile: UserProfile?) {
         viewModelScope.launch {
             try {
-                val validProducts = rawProducts.filter { it.id.isNotBlank() }
-                val pendingList = validProducts.filter { !it.isVerified || !it.isAvailable || !it.isInStock }
-                val targetList = if (pendingList.isNotEmpty()) pendingList else validProducts
+                val pendingList = rawProducts.filter { !it.finalApproval || it.publishingStatus != "PUBLISHED" }
+                val targetList = if (pendingList.isNotEmpty()) pendingList else rawProducts
 
                 if (targetList.isEmpty()) {
                     _uiEvent.emit(UiEvent.ShowSuccess("All products are already approved!"))
                     return@launch
                 }
 
-                _uiEvent.emit(UiEvent.ShowSuccess("Approving & publishing ${targetList.size} products..."))
+                _uiEvent.emit(UiEvent.ShowSuccess("Granting Admin Override for ${targetList.size} products..."))
 
-                val sellerId = currentUserProfile?.uid.takeIf { !it.isNullOrBlank() } ?: "seller_1"
-                val sellerName = currentUserProfile?.name.takeIf { !it.isNullOrBlank() } ?: "Flash-O Seller"
-
-                targetList.chunked(200).forEach { chunk ->
-                    val batch = firestore.batch()
-                    chunk.forEach { product ->
-                        val docRef = firestore.collection("products").document(product.id)
-                        val updates = mutableMapOf<String, Any>(
-                            "isVerified" to true,
-                            "isAvailable" to true,
-                            "isInStock" to true,
-                            "inStock" to true,
-                            "verifiedBy" to (auth.currentUser?.uid ?: "admin"),
-                            "verificationDate" to System.currentTimeMillis()
-                        )
-                        if (product.sellerId.isBlank() || product.sellerId == "seller_1") {
-                            updates["sellerId"] = sellerId
-                            updates["sellerName"] = sellerName
-                        }
-                        if (product.stockQuantity <= 0) {
-                            updates["stockQuantity"] = 50
-                            updates["stockCount"] = 50
-                        }
-                        batch.set(docRef, updates, com.google.firebase.firestore.SetOptions.merge())
+                var approvedCount = 0
+                targetList.forEach { product ->
+                    val res = productRepository.grantAdminOverride(product.id, "Bulk Admin Approval")
+                    if (res.isSuccess) {
+                        productRepository.publishProduct(product.id)
+                        approvedCount++
                     }
-                    batch.commit().await()
                 }
 
-                _uiEvent.emit(UiEvent.ShowSuccess("Successfully approved & published ${targetList.size} products!"))
+                _uiEvent.emit(UiEvent.ShowSuccess("Successfully approved & published $approvedCount products!"))
             } catch (e: Exception) {
                 Log.e("ProductViewModel", "Failed to approve all products", e)
                 _uiEvent.emit(UiEvent.ShowError("Bulk Approval Failed: ${e.message}"))
+            }
+        }
+    }
+
+    fun reservePreorderItem(productId: String, quantity: Int = 1) {
+        viewModelScope.launch {
+            val result = productRepository.reservePreorderItem(productId, quantity)
+            result.onSuccess {
+                _uiEvent.emit(UiEvent.ShowSuccess("Pre-order spot reserved!"))
+            }.onFailure { e ->
+                _uiEvent.emit(UiEvent.ShowError("Pre-order reservation failed: ${e.message}"))
             }
         }
     }

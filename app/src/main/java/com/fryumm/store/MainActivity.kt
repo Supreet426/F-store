@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -302,7 +303,7 @@ fun MainScreen(
 
     val currentTitle = when {
         currentRoute == "orders" -> "Live Orders Board"
-        currentRoute == "stores" -> "Product Catalog & Inventory"
+        currentRoute == "stores" -> "Product Catalog"
         currentRoute == "users" -> if (dynamicTitle.isNotEmpty()) dynamicTitle else "User Management Portal"
         currentRoute == "promotion" -> "Coupons & Promo Offers"
         currentRoute == "insights" -> "Overview"
@@ -387,165 +388,334 @@ fun MainScreen(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerTonalElevation = 0.dp
             ) {
-                // Drawer Header
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if(isAdmin) Color(0xFF1A237E) else MaterialTheme.colorScheme.primary)
-                        .padding(24.dp)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
                 ) {
-                    Surface(
-                        modifier = Modifier.size(64.dp),
-                        shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.2f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
+                    // Drawer Header
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (isAdmin) Color(0xFF1A237E) else MaterialTheme.colorScheme.primary)
+                            .padding(24.dp)
                     ) {
-                        if (userProfile.photoUrl.isNotEmpty()) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(context).data(userProfile.photoUrl).crossfade(true).build(),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.clip(CircleShape)
-                            )
-                        } else {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(userProfile.name.take(1).uppercase(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                        Surface(
+                            modifier = Modifier.size(64.dp),
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
+                        ) {
+                            if (userProfile.photoUrl.isNotEmpty()) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).data(userProfile.photoUrl).crossfade(true).build(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.clip(CircleShape)
+                                )
+                            } else {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(userProfile.name.take(1).uppercase(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                                }
                             }
                         }
+                        Spacer(Modifier.height(12.dp))
+                        Text(userProfile.name, color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                        Text(userProfile.email, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
                     }
+
                     Spacer(Modifier.height(12.dp))
-                    Text(userProfile.name, color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
-                    Text(userProfile.email, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                }
 
-                Spacer(Modifier.height(12.dp))
+                    // SECTION 1: MAIN OPERATIONS
+                    Text(
+                        "MAIN OPERATIONS",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp)
+                    )
 
-                // Drawer Items
-                NavigationDrawerItem(
-                    label = { Text("My Profile", fontWeight = FontWeight.Bold) },
-                    selected = currentRoute == "profile",
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        navController.navigate("profile")
-                    },
-                    icon = { Icon(Icons.Default.AccountCircle, null) },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-
-                NavigationDrawerItem(
-                    label = { Text("Refer Customers", fontWeight = FontWeight.Bold) },
-                    selected = currentRoute == "referral",
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        navController.navigate("referral")
-                    },
-                    icon = { Icon(Icons.Default.Stars, null) },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-
-                NavigationDrawerItem(
-                    label = { Text("Settlements", fontWeight = FontWeight.Bold) },
-                    selected = currentRoute == "settlements",
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        navController.navigate("settlements")
-                    },
-                    icon = { Icon(Icons.Default.AccountBalanceWallet, null) },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-
-                if (userProfile.userRole == UserRole.STORE_OWNER) {
                     NavigationDrawerItem(
-                        label = { Text("Store Operating Hours", fontWeight = FontWeight.Bold) },
+                        label = { Text("Live Orders & Dashboard", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "orders",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("orders") {
+                                popUpTo("orders") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(Icons.Default.ListAlt, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Products & Catalog", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "stores",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("stores") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.Store, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Stock & Inventory", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "inventory",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("inventory") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.Inventory2, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Low Stock Alerts", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "inventory_alerts",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("inventory_alerts") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.NotificationsActive, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Dispatch Hub", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "dispatch",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("dispatch") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.FlashOn, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // SECTION 2: CONTROL & HUB
+                    Text(
+                        "MANAGEMENT & ANALYTICS",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Analytics & Insights", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "insights",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("insights") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.Insights, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Dark Store Hubs", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "dark_stores",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("dark_stores") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.Storefront, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Location & Geofencing", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "location_settings",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("location_settings") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.LocationOn, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("App Control Center", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "app_management",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("app_management") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.Settings, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("User Activity & Accounts", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "users",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("users") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.People, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Promotions & Marketing", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "promotion",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("promotion") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.AdsClick, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // SECTION 3: MY ACCOUNT & SUPPORT
+                    Text(
+                        "MY ACCOUNT & SUPPORT",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("My Profile", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "profile",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("profile") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.AccountCircle, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Refer Customers", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "referral",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("referral") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.Stars, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Settlements & Wallet", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "settlements",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("settlements") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.AccountBalanceWallet, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    if (userProfile.userRole == UserRole.STORE_OWNER) {
+                        NavigationDrawerItem(
+                            label = { Text("Store Operating Hours", fontWeight = FontWeight.Bold) },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                navController.navigate("profile")
+                            },
+                            icon = { Icon(Icons.Default.Schedule, null) },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    }
+
+                    NavigationDrawerItem(
+                        label = { Text("Support & Help", fontWeight = FontWeight.Bold) },
+                        selected = currentRoute == "support",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("support") { launchSingleTop = true }
+                        },
+                        icon = { Icon(Icons.Default.SupportAgent, null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    if (isAdmin) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp), color = Color.LightGray.copy(alpha = 0.3f))
+
+                        Text(
+                            "ADMINISTRATIVE CONTROL",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF1A237E),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+                        )
+
+                        NavigationDrawerItem(
+                            label = { Text("Pending Approvals", fontWeight = FontWeight.Bold) },
+                            selected = currentRoute == "pending_approvals",
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                navController.navigate("pending_approvals") { launchSingleTop = true }
+                            },
+                            icon = { Icon(Icons.Default.HourglassTop, null) },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
+                        NavigationDrawerItem(
+                            label = { Text("Manage Referrals", fontWeight = FontWeight.Bold) },
+                            selected = currentRoute == "admin_referrals",
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                navController.navigate("admin_referrals") { launchSingleTop = true }
+                            },
+                            icon = { Icon(Icons.Default.TrackChanges, null) },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
+                        NavigationDrawerItem(
+                            label = { Text("Ecosystem Update", fontWeight = FontWeight.Bold) },
+                            selected = currentRoute == "app_update",
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                navController.navigate("app_update") { launchSingleTop = true }
+                            },
+                            icon = { Icon(Icons.Default.CloudSync, null) },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+                    NavigationDrawerItem(
+                        label = { Text("Change Password", fontWeight = FontWeight.Bold) },
                         selected = false,
                         onClick = {
                             scope.launch { drawerState.close() }
-                            navController.navigate("profile") 
+                            viewModel.sendPasswordResetEmail(userProfile.email)
                         },
-                        icon = { Icon(Icons.Default.Schedule, null) },
+                        icon = { Icon(Icons.Default.LockReset, null) },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text("Logout", fontWeight = FontWeight.Bold, color = Color.Red) },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            authViewModel.logout { viewModel.logout() }
+                        },
+                        icon = { Icon(Icons.Default.Logout, null, tint = Color.Red) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "F-Store v1.2.0",
+                        modifier = Modifier.padding(16.dp).align(Alignment.CenterHorizontally),
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
-                NavigationDrawerItem(
-                    label = { Text("Change Password", fontWeight = FontWeight.Bold) },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        viewModel.sendPasswordResetEmail(userProfile.email)
-                    },
-                    icon = { Icon(Icons.Default.LockReset, null) },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-
-                NavigationDrawerItem(
-                    label = { Text("Support & Help", fontWeight = FontWeight.Bold) },
-                    selected = currentRoute == "support",
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        navController.navigate("support")
-                    },
-                    icon = { Icon(Icons.Default.SupportAgent, null) },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-
-                if (isAdmin) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp), color = Color.LightGray.copy(alpha = 0.3f))
-                    
-                    NavigationDrawerItem(
-                        label = { Text("Pending Approvals", fontWeight = FontWeight.Bold) },
-                        selected = currentRoute == "pending_approvals",
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            navController.navigate("pending_approvals")
-                        },
-                        icon = { Icon(Icons.Default.HourglassTop, null) },
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                    )
-
-                    NavigationDrawerItem(
-                        label = { Text("Manage Referrals", fontWeight = FontWeight.Bold) },
-                        selected = currentRoute == "admin_referrals",
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            navController.navigate("admin_referrals")
-                        },
-                        icon = { Icon(Icons.Default.TrackChanges, null) },
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                    )
-
-                    NavigationDrawerItem(
-                        label = { Text("Ecosystem Update", fontWeight = FontWeight.Bold) },
-                        selected = currentRoute == "app_update",
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            navController.navigate("app_update")
-                        },
-                        icon = { Icon(Icons.Default.CloudSync, null) },
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                    )
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-
-                NavigationDrawerItem(
-                    label = { Text("Logout", fontWeight = FontWeight.Bold, color = Color.Red) },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        authViewModel.logout { viewModel.logout() }
-                    },
-                    icon = { Icon(Icons.Default.Logout, null, tint = Color.Red) },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-                
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "F-Store v1.2.0", 
-                    modifier = Modifier.padding(16.dp).align(Alignment.CenterHorizontally),
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     ) {
@@ -570,7 +740,11 @@ fun MainScreen(
                                         scope.launch { drawerState.open() }
                                     }
                                 }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                                    Icon(
+                                        if (navController.previousBackStackEntry != null) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.Menu,
+                                        contentDescription = if (navController.previousBackStackEntry != null) "Back" else "Open Drawer",
+                                        tint = Color.White
+                                    )
                                 }
                             }
                         },

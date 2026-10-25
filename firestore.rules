@@ -15,14 +15,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper: Is Verified & Active Merchant / Store Partner
-    function isVerifiedMerchant() {
-      return isAuthenticated() &&
-             (isMasterAdmin() ||
-              (exists(/databases/$(database)/documents/sellers/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/sellers/$(request.auth.uid)).data.isApproved == true));
-    }
-
     // Helper: Is Document Owner
     function isDocOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
@@ -33,9 +25,21 @@ service cloud.firestore {
       allow read, write: if isMasterAdmin();
     }
 
-    // Sellers / Merchants
+    // Merchants Collection - Protected Onboarding Gates & Isolated Profile Access
+    match /merchants/{merchantId} {
+      allow read: if isDocOwner(merchantId) || isMasterAdmin();
+      allow create: if isDocOwner(merchantId) &&
+                    (!('isApproved' in request.resource.data) || request.resource.data.isApproved == false) &&
+                    (!('isActive' in request.resource.data) || request.resource.data.isActive == false);
+      allow update: if (isDocOwner(merchantId) &&
+                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isApproved', 'registeredHubId', 'isActive', 'active', 'role'])) ||
+                    isMasterAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // Legacy Sellers Collection - Isolated Profile Access
     match /sellers/{sellerId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner(sellerId) || isMasterAdmin();
       allow create: if isDocOwner(sellerId);
       allow update: if isDocOwner(sellerId) || isMasterAdmin();
       allow delete: if isMasterAdmin();
@@ -43,7 +47,7 @@ service cloud.firestore {
 
     // Users / User Profiles - Master Admin Protection Rule
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner(userId) || isMasterAdmin();
       allow update: if (isDocOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role != 'ADMIN')) || isMasterAdmin();
       allow delete: if isMasterAdmin() &&
                     userId != 'master_admin_ranjana' &&
@@ -54,61 +58,77 @@ service cloud.firestore {
     match /admins/{adminId} {
       allow read: if isMasterAdmin();
       allow create, update: if isMasterAdmin();
-      allow delete: if false; // Protect admin records from client deletion
+      allow delete: if false;
     }
 
     // Customers
     match /customers/{customerId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner(customerId) || isMasterAdmin();
       allow write: if isDocOwner(customerId) || isMasterAdmin();
     }
 
     // Orders Collection
     match /orders/{orderId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.userId == request.auth.uid || resource.data.merchantId == request.auth.uid || isMasterAdmin());
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (isVerifiedMerchant() || resource.data.customerId == request.auth.uid || resource.data.userId == request.auth.uid || isMasterAdmin());
+      allow update: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.userId == request.auth.uid || resource.data.merchantId == request.auth.uid || isMasterAdmin());
       allow delete: if isMasterAdmin();
     }
 
-    // Products Collection
+    // Private Internal Master Products Collection
+    // READ: Restricted to canonical merchant owner (merchantId == auth.uid) or Master Admin
+    // DIRECT CLIENT WRITES (create/update/delete) ARE STRICTLY DENIED (if false)
     match /products/{productId} {
-      allow read: if true; // Public catalog view for customers
-      allow create, update, delete: if isVerifiedMerchant();
+      allow read: if isAuthenticated() && (resource.data.merchantId == request.auth.uid || isMasterAdmin());
+      allow create, update, delete: if false;
+    }
+
+    // Public Catalog Projection Collection
+    // READ: Public for customer catalog app views ONLY
+    // DIRECT CLIENT WRITES STRICTLY DENIED (Server-owned projection via Cloud Functions)
+    match /public_products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    // Preorder Reservations Collection
+    // READ: Customer can read their own reservation documents
+    // DIRECT CLIENT WRITES STRICTLY DENIED (Server-owned via Cloud Functions)
+    match /preorder_reservations/{reservationId} {
+      allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || isMasterAdmin());
+      allow create, update, delete: if false;
     }
 
     // Dark Stores / Hubs Collection
     match /dark_stores/{storeId} {
-      allow read: if true; // Public store locations view
-      allow create, update, delete: if isVerifiedMerchant();
+      allow read: if true;
+      allow create, update, delete: if isMasterAdmin();
     }
 
     // Riders Collection
     match /riders/{riderId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner(riderId) || isMasterAdmin();
       allow write: if isDocOwner(riderId) || isMasterAdmin();
     }
 
-    // Staff & Support Staff Collection
+    // Staff Collection
     match /staff/{staffId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner(staffId) || isMasterAdmin();
       allow write: if isDocOwner(staffId) || isMasterAdmin();
     }
 
     // Customer Leads & Profiles
     match /customer_leads/{leadId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isDocOwner(leadId) || isMasterAdmin();
     }
 
     match /profiles/{profileId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isDocOwner(profileId) || isMasterAdmin();
     }
 
     match /accounts/{accountId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isDocOwner(accountId) || isMasterAdmin();
     }
-
-    // --- FLASH-O CARE: Support & Config Rules ---
 
     // App Configuration: Everyone can read, only Admin can write
     match /app_config/{configId} {
@@ -125,10 +145,8 @@ service cloud.firestore {
 
     // Live Support Chats
     match /support_chats/{chatId} {
-      // Users can only read/write their own chat document
       allow read, write: if isDocOwner(chatId) || isMasterAdmin();
 
-      // Messages subcollection
       match /messages/{messageId} {
         allow read, write: if get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid || isMasterAdmin();
       }

@@ -58,12 +58,12 @@ class NotificationRepository @Inject constructor(
         orderId: String,
         customerName: String,
         amount: Double,
-        sellerId: String = "",
+        merchantId: String = "",
         darkStoreId: String = ""
     ) {
         try {
             val targetTopic = when {
-                sellerId.isNotEmpty() -> "merchant_$sellerId"
+                merchantId.isNotEmpty() -> "merchant_$merchantId"
                 darkStoreId.isNotEmpty() -> "darkstore_$darkStoreId"
                 else -> "admin_orders"
             }
@@ -78,7 +78,7 @@ class NotificationRepository @Inject constructor(
                     "customerName" to customerName,
                     "amount" to amount.toString(),
                     "targetUid" to targetUserId,
-                    "sellerId" to sellerId,
+                    "merchantId" to merchantId,
                     "darkStoreId" to darkStoreId,
                     "targetTopic" to targetTopic
                 ),

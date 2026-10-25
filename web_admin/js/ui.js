@@ -42,7 +42,7 @@ export function switchTab(tabId, isBackAction = false) {
         'merchant-home': 'Merchant Store Partner Portal',
         'user-profile': 'User Profile Details & Governance',
         'app-control': 'App Control Center',
-        'products': 'Product Catalog & Inventory',
+        'products': 'Product Catalog',
         'orders': 'Live Orders Board',
         'dark-stores': 'Dark Store Fulfillment Hubs',
         'riders': 'Delivery Partner Hub',

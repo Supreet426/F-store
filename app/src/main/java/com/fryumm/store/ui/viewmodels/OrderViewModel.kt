@@ -248,11 +248,11 @@ class OrderViewModel @Inject constructor(
                 else -> {
                     // MERCHANT or DARK STORE
                     rawOrders.filter { order ->
-                        order.sellerId == profile.uid ||
-                        (!profile.darkStoreId.isNullOrEmpty() && order.sellerId == profile.darkStoreId) ||
+                        order.merchantId == profile.uid ||
+                        (!profile.darkStoreId.isNullOrEmpty() && order.merchantId == profile.darkStoreId) ||
                         order.items.any { item ->
-                            item.product.sellerId == profile.uid ||
-                            (!profile.darkStoreId.isNullOrEmpty() && item.product.sellerId == profile.darkStoreId)
+                            item.product.merchantId == profile.uid ||
+                            (!profile.darkStoreId.isNullOrEmpty() && item.product.merchantId == profile.darkStoreId)
                         }
                     }
                 }
@@ -271,8 +271,8 @@ class OrderViewModel @Inject constructor(
             orderRepository.updateOrderFields(orderId, mapOf(
                 "status" to OrderStatus.READY,
                 "readyAt" to System.currentTimeMillis(),
-                "sellerLatitude" to currentProfile?.latitude,
-                "sellerLongitude" to currentProfile?.longitude
+                "merchantLatitude" to currentProfile?.latitude,
+                "merchantLongitude" to currentProfile?.longitude
             ))
         }
     }
@@ -329,7 +329,7 @@ class OrderViewModel @Inject constructor(
                     it.readyAt != null &&
                     (now - it.readyAt!!) > fiveMinutes
                 }.forEach { order ->
-                    val nearestRider = getNearbyRiders(order.sellerLatitude, order.sellerLongitude, emptyList()).firstOrNull { it.second <= 1000 }?.first
+                    val nearestRider = getNearbyRiders(order.merchantLatitude, order.merchantLongitude, emptyList()).firstOrNull { it.second <= 1000 }?.first
                     if (nearestRider != null) {
                         assignOrderToRider(order.id, nearestRider.id)
                         Log.d("AutoAssign", "SYSTEM: Order ${order.id} auto-assigned to ${nearestRider.name} (5 min timeout)")

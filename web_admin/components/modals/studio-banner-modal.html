@@ -1,0 +1,356 @@
+<!-- FULL SCREEN MODAL / EDITOR PAGE: HERO BANNER STUDIO -->
+<div id="modal-banner" class="fixed inset-0 z-[100] hidden bg-slate-950 flex flex-col w-screen h-screen overflow-hidden">
+
+    <!-- Top Full Width Header Bar -->
+    <header class="h-16 bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between shrink-0 shadow-xl">
+        <div class="flex items-center gap-3">
+            <button type="button" onclick="closeHeroBannerModal()" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors">
+                <i class="fa-solid fa-arrow-left text-sm"></i>
+            </button>
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold border border-indigo-500/30">
+                <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+            </div>
+            <div>
+                <h3 class="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                    Hero Banner Design Studio
+                    <span class="text-[9px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-2.5 py-0.5 rounded-full font-bold uppercase">Full-Screen Editor</span>
+                </h3>
+                <p class="text-xs text-slate-400 hidden sm:block">Design, preview, schedule and publish promotional sliders for Flash-O Home Screen.</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button type="button" onclick="closeHeroBannerModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer hidden sm:block">
+                Cancel
+            </button>
+            <button type="button" onclick="handleHeroBannerSubmit(event)" class="btn-primary bg-indigo-600 hover:bg-indigo-500 text-xs px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-600/30 cursor-pointer transition-all flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Save & Publish Banner
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Two Columns Body -->
+    <div class="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-950">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            <!-- LEFT COLUMN: Multi-Slide Carousel Player & Presets (lg:col-span-5) -->
+            <div class="lg:col-span-5 space-y-6 lg:sticky lg:top-0">
+
+                <!-- Slide Selector Tabs Bar -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-xl">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-800/80 mb-2">
+                        <span class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-layer-group"></i> Active Carousel Slides
+                        </span>
+                        <button type="button" onclick="createNewStudioSlide()" class="text-[10px] font-bold bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 border border-indigo-500/40 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer">
+                            <i class="fa-solid fa-plus"></i> New Slide
+                        </button>
+                    </div>
+                    <div id="studio-slide-tabs-container" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                        <!-- Dynamic Slide Tabs rendered by JS -->
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-eye text-indigo-400"></i> Studio Canvas Preview
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <button type="button" id="btn-device-desktop" onclick="setStudioDeviceMode('desktop')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-indigo-600 text-white border border-indigo-500/50">
+                                <i class="fa-solid fa-desktop"></i> Desktop
+                            </button>
+                            <button type="button" id="btn-device-mobile" onclick="setStudioDeviceMode('mobile')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:text-white">
+                                <i class="fa-solid fa-mobile-screen-button"></i> Mobile
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live Banner Canvas Box -->
+                    <div id="banner-preview-wrapper" class="w-full transition-all duration-300">
+                        <div id="banner-live-preview-box" class="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-green-700 via-emerald-600 to-green-800 text-white relative overflow-hidden shadow-2xl border border-white/20 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all duration-300 min-h-[170px]">
+                            <!-- Dynamic Content rendered by updateBannerLivePreview() -->
+                        </div>
+                    </div>
+
+                    <!-- Interactive Player Controls & Slide Indicator Dots -->
+                    <div class="flex items-center justify-between bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="studioPrevSlide()" title="Previous Slide" class="w-8 h-8 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer border border-slate-800">
+                                <i class="fa-solid fa-chevron-left text-xs"></i>
+                            </button>
+                            <button type="button" onclick="toggleStudioAutoPlay()" title="Auto-Play Carousel" class="w-8 h-8 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white flex items-center justify-center cursor-pointer border border-indigo-500/40">
+                                <i id="studio-play-pause-icon" class="fa-solid fa-pause text-xs"></i>
+                            </button>
+                            <button type="button" onclick="studioNextSlide()" title="Next Slide" class="w-8 h-8 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer border border-slate-800">
+                                <i class="fa-solid fa-chevron-right text-xs"></i>
+                            </button>
+                        </div>
+
+                        <!-- Dots Container -->
+                        <div id="studio-preview-dots-container" class="flex items-center gap-1.5">
+                            <!-- Dynamic Dots -->
+                        </div>
+
+                        <span id="studio-slide-counter" class="text-[10px] font-mono font-bold text-slate-400">
+                            Slide 1 of 1
+                        </span>
+                    </div>
+
+                    <!-- Color Gradient Theme Quick Selector -->
+                    <div class="pt-2">
+                        <label class="block text-xs font-semibold text-slate-400 mb-2">Theme Gradient Presets</label>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <button type="button" onclick="setGradientPreset('from-green-700 via-emerald-600 to-green-800')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-green-700 to-green-800 border border-white/20 hover:scale-105 transition-transform truncate">Emerald Green</button>
+                            <button type="button" onclick="setGradientPreset('from-indigo-800 via-purple-700 to-pink-700')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-indigo-800 to-pink-700 border border-white/20 hover:scale-105 transition-transform truncate">Indigo Purple</button>
+                            <button type="button" onclick="setGradientPreset('from-amber-600 via-orange-600 to-rose-700')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-amber-600 to-rose-700 border border-white/20 hover:scale-105 transition-transform truncate">Fiery Orange</button>
+                            <button type="button" onclick="setGradientPreset('from-cyan-700 via-blue-700 to-slate-900')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-cyan-700 to-slate-900 border border-white/20 hover:scale-105 transition-transform truncate">Ocean Blue</button>
+                            <button type="button" onclick="setGradientPreset('from-rose-700 via-red-600 to-amber-700')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-rose-700 to-amber-700 border border-white/20 hover:scale-105 transition-transform truncate">Red Flash</button>
+                            <button type="button" onclick="setGradientPreset('from-slate-900 via-purple-950 to-slate-900')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-slate-900 to-purple-950 border border-white/20 hover:scale-105 transition-transform truncate">Midnight Dark</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Comprehensive Customization Form (lg:col-span-7) -->
+            <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+                <form id="form-banner" class="space-y-6" onsubmit="handleHeroBannerSubmit(event)">
+                    <input type="hidden" id="banner-id">
+
+                    <!-- Section 1: Copywriting, Fonts & Layout -->
+                    <div class="space-y-4">
+                        <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-800">
+                            <i class="fa-solid fa-pen-nib"></i> 1. Banner Copywriting & Layout Styling
+                        </h4>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="banner-title-input" class="block text-xs font-semibold text-slate-300 mb-1">Banner Headline Title *</label>
+                                <input type="text" id="banner-title-input" required oninput="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-indigo-500" placeholder="e.g., Organic Produce 30% Off">
+                            </div>
+                            <div>
+                                <label for="banner-subtitle-input" class="block text-xs font-semibold text-slate-300 mb-1">Subtitle / Description</label>
+                                <input type="text" id="banner-subtitle-input" oninput="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-indigo-500" placeholder="e.g., Farm fresh vegetables delivered in 10 mins">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label for="banner-text-color-input" class="block text-xs font-semibold text-slate-300 mb-1">Text Color Palette</label>
+                                <select id="banner-text-color-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl">
+                                    <option value="text-white">White (Classic)</option>
+                                    <option value="text-slate-950">Dark Slate (High Contrast)</option>
+                                    <option value="text-amber-300">Gold Amber Glow</option>
+                                    <option value="text-rose-200">Rose Pink</option>
+                                    <option value="text-cyan-200">Cyan Breeze</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="banner-text-align-input" class="block text-xs font-semibold text-slate-300 mb-1">Text Alignment</label>
+                                <select id="banner-text-align-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl">
+                                    <option value="text-left">Left Aligned</option>
+                                    <option value="text-center">Center Aligned</option>
+                                    <option value="text-right">Right Aligned</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="banner-bg-gradient-input" class="block text-xs font-semibold text-slate-300 mb-1">Gradient Theme Class</label>
+                                <input type="text" id="banner-bg-gradient-input" oninput="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 font-mono rounded-xl focus:border-indigo-500" placeholder="from-green-700 via-emerald-600 to-green-800">
+                            </div>
+                        </div>
+
+                        <!-- Hide Text Overlay Switch -->
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                            <div>
+                                <span class="block text-xs font-bold text-white">Hide Text & Badge Overlay</span>
+                                <span class="text-[10px] text-slate-400">Check if your uploaded image already contains custom graphic text.</span>
+                            </div>
+                            <input type="checkbox" id="banner-hide-text-overlay-input" onchange="updateBannerLivePreview()" class="w-5 h-5 rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Badges & CTA Customization -->
+                    <div class="space-y-4 pt-2">
+                        <h4 class="text-xs font-bold text-pink-400 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-800">
+                            <i class="fa-solid fa-tag"></i> 2. Badges, Icons & CTA Button Styling
+                        </h4>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label for="banner-badge-input" class="block text-xs font-semibold text-slate-300 mb-1">Top Badge Pill Text</label>
+                                <input type="text" id="banner-badge-input" oninput="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-pink-500" placeholder="e.g., FLASH DEAL, 50% OFF">
+                            </div>
+                            <div>
+                                <label for="banner-badge-color-input" class="block text-xs font-semibold text-slate-300 mb-1">Badge Theme Color</label>
+                                <select id="banner-badge-color-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl">
+                                    <option value="bg-white/20 text-white border-white/30">Glass White (Blur)</option>
+                                    <option value="bg-rose-600 text-white border-rose-500">Red Flash Deal</option>
+                                    <option value="bg-amber-500 text-slate-950 border-amber-400">Amber Glow</option>
+                                    <option value="bg-emerald-600 text-white border-emerald-500">Emerald Green</option>
+                                    <option value="bg-indigo-600 text-white border-indigo-500">Indigo Royal</option>
+                                    <option value="bg-slate-900 text-amber-400 border-amber-500/50">Dark Gold Pill</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="banner-badge-icon-input" class="block text-xs font-semibold text-slate-300 mb-1">Badge Icon</label>
+                                <select id="banner-badge-icon-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl">
+                                    <option value="fa-bolt">&#9889; Bolt</option>
+                                    <option value="fa-fire">&#128293; Fire / Hot</option>
+                                    <option value="fa-percent">% Percentage</option>
+                                    <option value="fa-tag">&#127991; Tag</option>
+                                    <option value="fa-clock">&#9200; Clock Timer</option>
+                                    <option value="fa-star">&#11088; Star Deal</option>
+                                    <option value="fa-gift">&#127873; Gift Offer</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label for="banner-cta-text-input" class="block text-xs font-semibold text-slate-300 mb-1">CTA Button Label</label>
+                                <input type="text" id="banner-cta-text-input" oninput="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-pink-500" placeholder="e.g., Shop Now, Order Today">
+                            </div>
+                            <div>
+                                <label for="banner-cta-style-input" class="block text-xs font-semibold text-slate-300 mb-1">CTA Button Style</label>
+                                <select id="banner-cta-style-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl">
+                                    <option value="bg-white text-gray-900 hover:bg-gray-100">White Solid Pill</option>
+                                    <option value="bg-slate-900 text-white hover:bg-slate-800 border border-slate-700">Dark Solid Pill</option>
+                                    <option value="bg-amber-400 text-slate-950 font-black hover:bg-amber-300">Glowing Amber</option>
+                                    <option value="bg-white/20 text-white backdrop-blur-md border border-white/40 hover:bg-white/30">Glassmorphism Blur</option>
+                                    <option value="bg-emerald-500 text-slate-950 font-black hover:bg-emerald-400">Neon Emerald</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="banner-cta-icon-input" class="block text-xs font-semibold text-slate-300 mb-1">CTA Button Icon</label>
+                                <select id="banner-cta-icon-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl">
+                                    <option value="fa-arrow-right">&#10142; Arrow Right</option>
+                                    <option value="fa-basket-shopping">&#129530; Basket</option>
+                                    <option value="fa-bolt">&#9889; Fast Order</option>
+                                    <option value="fa-chevron-right">&#8250; Chevron Right</option>
+                                    <option value="fa-bag-shopping">&#128717; Shopping Bag</option>
+                                    <option value="none">None</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Media & 3D Visual Asset Transformation -->
+                    <div class="space-y-4 pt-2">
+                        <h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-800">
+                            <i class="fa-solid fa-cube"></i> 3. Media Asset, 3D Effects & Image Geometry
+                        </h4>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="banner-image-desktop-input" class="block text-xs font-semibold text-slate-300 mb-1">Desktop Image URL *</label>
+                                <input type="url" id="banner-image-desktop-input" required oninput="updateBannerLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-cyan-500" placeholder="https://images.unsplash.com/...">
+                            </div>
+                            <div>
+                                <label for="banner-image-mobile-input" class="block text-xs font-semibold text-slate-300 mb-1">Mobile Image URL (Optional)</label>
+                                <input type="url" id="banner-image-mobile-input" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-cyan-500" placeholder="https://... (defaults to desktop image)">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                            <div>
+                                <label for="banner-image-scale-input" class="block text-xs font-semibold text-slate-300 mb-1">Image Zoom Scale</label>
+                                <select id="banner-image-scale-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-900 border-slate-700 text-white text-xs py-2.5 rounded-xl">
+                                    <option value="scale-90">Compact (90%)</option>
+                                    <option value="scale-100" selected>Standard (100%)</option>
+                                    <option value="scale-110">Large Zoom (110%)</option>
+                                    <option value="scale-125">Extra Large (125%)</option>
+                                    <option value="scale-150">3D Popout (150%)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="banner-image-fit-input" class="block text-xs font-semibold text-slate-300 mb-1">Fit & Alignment</label>
+                                <select id="banner-image-fit-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-900 border-slate-700 text-white text-xs py-2.5 rounded-xl">
+                                    <option value="object-cover" selected>Cover Fill</option>
+                                    <option value="object-contain">Contain Floating</option>
+                                    <option value="object-contain object-right">Align Right Edge</option>
+                                    <option value="object-contain object-center">Center Floating</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="banner-image-glow-input" class="block text-xs font-semibold text-slate-300 mb-1">3D Backdrop Aura/Glow</label>
+                                <select id="banner-image-glow-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-900 border-slate-700 text-white text-xs py-2.5 rounded-xl">
+                                    <option value="none">No Glow</option>
+                                    <option value="glow-cyan" selected>Cyan Neon Glow</option>
+                                    <option value="glow-emerald">Emerald Gold Halo</option>
+                                    <option value="glow-amber">Amber Sunburst</option>
+                                    <option value="glow-purple">Cyberpunk Purple</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="banner-image-effect-input" class="block text-xs font-semibold text-slate-300 mb-1">3D Hover Motion</label>
+                                <select id="banner-image-effect-input" onchange="updateBannerLivePreview()" class="input-field bg-slate-900 border-slate-700 text-white text-xs py-2.5 rounded-xl">
+                                    <option value="tilt_pop" selected>3D Tilt & Popout</option>
+                                    <option value="float">3D Floating Levitation</option>
+                                    <option value="zoom_rotate">3D Zoom & Rotation</option>
+                                    <option value="none">Static (No Animation)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Destination & Audience Targeting -->
+                    <div class="space-y-4 pt-2">
+                        <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-800">
+                            <i class="fa-solid fa-compass"></i> 4. Destination & Audience Segmentation
+                        </h4>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="banner-action-type-input" class="block text-xs font-semibold text-slate-300 mb-1">Action Type</label>
+                                <select id="banner-action-type-input" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-amber-500">
+                                    <option value="category">Category Filter Page</option>
+                                    <option value="flash_sale">Flash Sale Screen</option>
+                                    <option value="external_url">External Web Link</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="banner-action-input" class="block text-xs font-semibold text-slate-300 mb-1">Target Action Destination</label>
+                                <input type="text" id="banner-action-input" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-amber-500" placeholder="e.g. flash_sale or categories">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="banner-city-input" class="block text-xs font-semibold text-slate-300 mb-1">Target City</label>
+                                <select id="banner-city-input" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-amber-500">
+                                    <option value="All">All Cities (Global)</option>
+                                    <option value="Delhi NCR">Delhi NCR</option>
+                                    <option value="Mumbai">Mumbai</option>
+                                    <option value="Bengaluru">Bengaluru</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="banner-priority-input" class="block text-xs font-semibold text-slate-300 mb-1">Display Rank Priority</label>
+                                <input type="number" id="banner-priority-input" min="1" max="99" value="1" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-amber-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visibility & Submit -->
+                    <div class="flex items-center justify-between p-4 bg-emerald-950/30 border border-emerald-800/40 rounded-2xl">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="banner-active-input" checked class="w-5 h-5 rounded bg-slate-800 border-slate-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                            <label for="banner-active-input" class="text-xs font-bold text-white cursor-pointer">
+                                Publish Hero Banner Immediately (Active)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button type="button" onclick="closeHeroBannerModal()" class="px-6 py-3 text-xs font-bold text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-primary bg-indigo-600 hover:bg-indigo-500 text-xs px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-600/30 cursor-pointer transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i> Save & Publish Banner
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

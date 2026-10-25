@@ -26,7 +26,7 @@ import com.fryumm.store.ui.viewmodels.StoreViewModel
 @Composable
 fun InventoryAlertsScreen(viewModel: StoreViewModel, navController: NavHostController) {
     val lowStockItems = viewModel.lowStockProducts
-    val groupedItems = lowStockItems.groupBy { it.sellerName }
+    val groupedItems = lowStockItems.groupBy { it.merchantName }
 
     Scaffold(
         topBar = {
@@ -70,13 +70,13 @@ fun InventoryAlertsScreen(viewModel: StoreViewModel, navController: NavHostContr
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                groupedItems.forEach { (sellerName, products) ->
+                groupedItems.forEach { (merchantName, products) ->
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Store, null, tint = FStorePurple, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = sellerName,
+                                text = merchantName,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
                                 color = FStorePurple
@@ -85,7 +85,7 @@ fun InventoryAlertsScreen(viewModel: StoreViewModel, navController: NavHostContr
                     }
                     items(products) { product ->
                         LowStockProductCard(product, onRemind = {
-                            viewModel.remindSellerAboutStock(product)
+                            viewModel.remindMerchantAboutStock(product)
                         })
                     }
                 }
@@ -134,7 +134,7 @@ fun LowStockProductCard(product: Product, onRemind: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = FStorePurple.copy(alpha = 0.1f)),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) {
-                Text("Remind Seller", color = FStorePurple, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Remind Merchant", color = FStorePurple, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

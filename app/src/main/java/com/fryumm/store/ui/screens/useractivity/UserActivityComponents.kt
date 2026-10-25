@@ -25,6 +25,7 @@ import coil.request.ImageRequest
 import com.fryumm.store.ui.viewmodels.StoreViewModel
 import com.fryumm.store.data.model.*
 import com.fryumm.store.ui.theme.FStorePurple
+import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
@@ -42,69 +43,50 @@ fun IntelligenceCard(label: String, value: String, color: Color, isSelected: Boo
     }
 }
 
-@Composable
-fun CustomerListItem(customer: CustomerProfile, onClick: () -> Unit) {
-    val context = LocalContext.current
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = CircleShape,
-                color = FStorePurple.copy(alpha = 0.1f)
-            ) {
-                if (customer.photoUrl.isNotEmpty()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(customer.photoUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.clip(CircleShape)
-                    )
-                } else {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.PersonOutline, null, tint = FStorePurple)
-                    }
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(customer.name, fontWeight = FontWeight.Bold)
-                Text("${customer.totalOrders} orders • Spent: ₹${customer.lifetimeSpending.toInt()}", fontSize = 12.sp, color = Color.Gray)
-            }
-            Spacer(Modifier.weight(1f))
-            if (customer.totalOrders > 1) {
-                Surface(color = Color(0xFFE3F2FD), shape = RoundedCornerShape(4.dp)) {
-                    Text("REPEAT", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1976D2))
-                }
-            }
-        }
-    }
+fun formatTimestamp(timestamp: Long?): String {
+    if (timestamp == null || timestamp <= 0L) return "N/A"
+    val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+    return sdf.format(Date(timestamp))
+}
+
+fun formatDateOnly(timestamp: Long?): String {
+    if (timestamp == null || timestamp <= 0L) return "N/A"
+    val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+    return sdf.format(Date(timestamp))
 }
 
 @Composable
-fun UserListItem(user: UserProfile, onClick: () -> Unit, onStatusChange: ((Boolean) -> Unit)? = null) {
+fun UserSummaryCard(
+    name: String,
+    photoUrl: String,
+    mobile: String,
+    joinedDate: Long?,
+    lastActive: Long?,
+    lastOrderDate: Long?,
+    roleText: String,
+    onClick: () -> Unit,
+    onRoleChangeClick: () -> Unit
+) {
     val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Surface(
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(48.dp),
                 shape = CircleShape,
                 color = FStorePurple.copy(alpha = 0.1f)
             ) {
-                if (user.photoUrl.isNotEmpty()) {
+                if (photoUrl.isNotEmpty()) {
                     AsyncImage(
                         model = ImageRequest.Builder(context)
-                            .data(user.photoUrl)
+                            .data(photoUrl)
                             .crossfade(true)
                             .build(),
                         contentDescription = null,
@@ -113,191 +95,118 @@ fun UserListItem(user: UserProfile, onClick: () -> Unit, onStatusChange: ((Boole
                     )
                 } else {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(when(user.userRole) {
-                            UserRole.RIDER -> Icons.Default.DeliveryDining
-                            UserRole.ADMIN -> Icons.Default.AdminPanelSettings
-                            UserRole.OTHER -> Icons.Default.HeadsetMic
-                            else -> Icons.Default.Store
-                        }, null, tint = FStorePurple)
+                        Icon(Icons.Default.Person, null, tint = FStorePurple)
                     }
                 }
             }
             Spacer(Modifier.width(12.dp))
+
             Column(modifier = Modifier.weight(1f)) {
-                Text(user.name, fontWeight = FontWeight.Bold)
-                Text(if (user.email.isNotEmpty()) user.email else user.phoneNumber, fontSize = 12.sp, color = Color.Gray)
-                if (user.userRole == UserRole.OTHER && user.staffDepartment.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Spacer(Modifier.width(8.dp))
                     Surface(
-                        color = Color(0xFFE8EAF6),
+                        color = FStorePurple.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = user.staffDepartment,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF283593),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = roleText,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = FStorePurple,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                         )
                     }
                 }
+                Spacer(Modifier.height(4.dp))
+                Text("Mobile: ${mobile.ifEmpty { "N/A" }}", fontSize = 12.sp, color = Color.DarkGray)
+                Text("Joined: ${formatDateOnly(joinedDate)}", fontSize = 11.sp, color = Color.Gray)
+                Text("Last Active: ${formatTimestamp(lastActive)}", fontSize = 11.sp, color = Color.Gray)
+                Text("Last Order: ${formatDateOnly(lastOrderDate)}", fontSize = 11.sp, color = Color.Gray)
             }
-            Switch(checked = user.active, onCheckedChange = onStatusChange)
+
+            Spacer(Modifier.width(8.dp))
+
+            OutlinedButton(
+                onClick = onRoleChangeClick,
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = FStorePurple)
+            ) {
+                Icon(Icons.Default.ManageAccounts, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Role Change", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
 
 @Composable
-fun StoreManagementCard(user: UserProfile, darkStores: List<DarkStore>, onAssignHub: (String?) -> Unit, onClick: () -> Unit, onStatusChange: (Boolean) -> Unit) {
-    var isPromoted by remember { mutableStateOf(false) }
-    var showHubMenu by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+fun CustomerListItem(customer: CustomerProfile, viewModel: StoreViewModel?, onClick: () -> Unit, onRoleChangeClick: () -> Unit) {
+    UserSummaryCard(
+        name = customer.name,
+        photoUrl = customer.photoUrl,
+        mobile = customer.mobile,
+        joinedDate = customer.joinedDate,
+        lastActive = customer.lastLogin,
+        lastOrderDate = customer.lastOrderDate,
+        roleText = "CUSTOMER",
         onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(user.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text(user.email, fontSize = 11.sp, color = Color.Gray)
-                }
-                Switch(checked = user.active, onCheckedChange = { onStatusChange(it) })
-            }
-            
-            Spacer(Modifier.height(8.dp))
-            
-            Surface(
-                color = Color(0xFFF3E5F5),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp).clickable { showHubMenu = true },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Hub, null, modifier = Modifier.size(16.dp), tint = FStorePurple)
-                    Spacer(Modifier.width(8.dp))
-                    val hubName = darkStores.find { it.id == user.darkStoreId }?.name ?: "Assign to Hub (Dark Store)"
-                    Text(hubName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = FStorePurple, modifier = Modifier.weight(1f))
-                    Icon(Icons.Default.ArrowDropDown, null, tint = FStorePurple)
-                    
-                    DropdownMenu(expanded = showHubMenu, onDismissRequest = { showHubMenu = false }) {
-                        DropdownMenuItem(text = { Text("None / De-assign") }, onClick = { onAssignHub(null); showHubMenu = false })
-                        darkStores.forEach { ds ->
-                            DropdownMenuItem(text = { Text(ds.name) }, onClick = { onAssignHub(ds.id); showHubMenu = false })
-                        }
-                    }
-                }
-            }
-            
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        if (isPromoted) Icons.Default.Star else Icons.Default.StarOutline,
-                        contentDescription = null,
-                        tint = if (isPromoted) Color(0xFFFFD700) else Color.Gray,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Promoted Store", fontSize = 13.sp)
-                }
-                Checkbox(checked = isPromoted, onCheckedChange = { isPromoted = it })
-            }
-        }
-    }
+        onRoleChangeClick = onRoleChangeClick
+    )
+}
+
+@Composable
+fun UserListItem(user: UserProfile, viewModel: StoreViewModel?, onClick: () -> Unit, onRoleChangeClick: () -> Unit) {
+    val lastOrderDate = viewModel?.getLastOrderDateForUser(user.uid, user.email, user.phoneNumber)
+    UserSummaryCard(
+        name = user.name,
+        photoUrl = user.photoUrl,
+        mobile = if (user.phoneNumber.isNotEmpty()) user.phoneNumber else user.email,
+        joinedDate = user.lastLogin,
+        lastActive = user.lastLogin,
+        lastOrderDate = lastOrderDate,
+        roleText = user.userRole.name,
+        onClick = onClick,
+        onRoleChangeClick = onRoleChangeClick
+    )
+}
+
+@Composable
+fun StoreManagementCard(user: UserProfile, darkStores: List<DarkStore>, viewModel: StoreViewModel?, onClick: () -> Unit, onRoleChangeClick: () -> Unit) {
+    val lastOrderDate = viewModel?.getLastOrderDateForUser(user.uid, user.email, user.phoneNumber)
+    UserSummaryCard(
+        name = user.name,
+        photoUrl = user.photoUrl,
+        mobile = if (user.phoneNumber.isNotEmpty()) user.phoneNumber else user.email,
+        joinedDate = user.lastLogin,
+        lastActive = user.lastLogin,
+        lastOrderDate = lastOrderDate,
+        roleText = user.userRole.name,
+        onClick = onClick,
+        onRoleChangeClick = onRoleChangeClick
+    )
 }
 
 @Composable
 fun RiderManagementCard(
     rider: UserProfile,
-    performance: RiderPerformance?,
+    viewModel: StoreViewModel?,
     onClick: () -> Unit,
-    onStatusChange: (Boolean) -> Unit
+    onRoleChangeClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+    val lastOrderDate = viewModel?.getLastOrderDateForUser(rider.uid, rider.email, rider.phoneNumber)
+    UserSummaryCard(
+        name = rider.name,
+        photoUrl = rider.photoUrl,
+        mobile = if (rider.phoneNumber.isNotEmpty()) rider.phoneNumber else rider.email,
+        joinedDate = rider.lastLogin,
+        lastActive = rider.lastLogin,
+        lastOrderDate = lastOrderDate,
+        roleText = rider.userRole.name,
         onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = CircleShape,
-                        color = if (rider.active) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        if (rider.photoUrl.isNotEmpty()) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(rider.photoUrl)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.clip(CircleShape)
-                            )
-                        } else {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.DirectionsBike,
-                                    contentDescription = null,
-                                    tint = if (rider.active) Color(0xFF2E7D32) else Color(0xFFC62828),
-                                    modifier = Modifier.padding(8.dp)
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(rider.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(if (rider.active) "Active" else "Inactive", fontSize = 11.sp, color = if (rider.active) Color(0xFF2E7D32) else Color.Gray)
-                    }
-                }
-                Switch(checked = rider.active, onCheckedChange = { onStatusChange(it) })
-            }
-
-            if (performance != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    RiderStatItem("Deliveries", performance.totalDeliveries.toString())
-                    RiderStatItem("Rating", String.format(Locale.getDefault(), "%.1f ★", performance.avgRating))
-                    RiderStatItem("Earnings", "₹${performance.totalEarnings.toInt()}")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RiderStatItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Black, fontSize = 14.sp)
-        Text(label, fontSize = 10.sp, color = Color.Gray)
-    }
+        onRoleChangeClick = onRoleChangeClick
+    )
 }
 
 @Composable

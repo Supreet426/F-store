@@ -31,10 +31,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val customerName = remoteMessage.data["customerName"] ?: "New Order"
             val amount = remoteMessage.data["amount"] ?: "0.0"
             val targetUid = remoteMessage.data["targetUid"] ?: ""
-            val sellerId = remoteMessage.data["sellerId"] ?: ""
+            val merchantId = remoteMessage.data["merchantId"] ?: remoteMessage.data["sellerId"] ?: ""
             val darkStoreId = remoteMessage.data["darkStoreId"] ?: ""
 
-            handleOrderCall(orderId, customerName, amount, targetUid, sellerId, darkStoreId)
+            handleOrderCall(orderId, customerName, amount, targetUid, merchantId, darkStoreId)
         } else {
             // General Notification
             val title = remoteMessage.notification?.title ?: remoteMessage.data["title"] ?: "F-Store"
@@ -49,7 +49,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         customerName: String,
         amount: String,
         targetUid: String,
-        sellerId: String,
+        merchantId: String,
         darkStoreId: String
     ) {
         val currentUser = FirebaseAuth.getInstance().currentUser ?: run {
@@ -60,11 +60,11 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val userEmail = currentUser.email?.lowercase() ?: ""
         val isAdmin = OrderNotificationHelper.MASTER_ADMIN_EMAILS.contains(userEmail)
         val isTargetUser = targetUid.isNotEmpty() && targetUid == currentUser.uid
-        val isDirectSeller = sellerId.isNotEmpty() && sellerId == currentUser.uid
-        val isDarkStoreMatch = darkStoreId.isNotEmpty() && (sellerId == darkStoreId || targetUid == darkStoreId)
+        val isDirectMerchant = merchantId.isNotEmpty() && merchantId == currentUser.uid
+        val isDarkStoreMatch = darkStoreId.isNotEmpty() && (merchantId == darkStoreId || targetUid == darkStoreId)
 
-        // Fast-path approval if Admin, direct seller, or dark store matches
-        if (isAdmin || isTargetUser || isDirectSeller || isDarkStoreMatch) {
+        // Fast-path approval if Admin, direct merchant, or dark store matches
+        if (isAdmin || isTargetUser || isDirectMerchant || isDarkStoreMatch) {
             triggerWakeAndNotification(customerName, amount, orderId)
             return
         }

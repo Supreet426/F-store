@@ -211,6 +211,58 @@ fun UserProfileDetailsDialog(user: UserProfile, viewModel: StoreViewModel, onDis
 }
 
 @Composable
+fun RoleChangeDialog(
+    userName: String,
+    currentRole: String,
+    onDismiss: () -> Unit,
+    onConfirmNewRole: (String) -> Unit
+) {
+    var selectedRole by remember { mutableStateOf(currentRole.ifEmpty { "CUSTOMER" }) }
+    var expanded by remember { mutableStateOf(false) }
+    val roles = listOf("CUSTOMER", "MERCHANT", "RIDER", "OTHER", "ADMIN")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change Role for $userName", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Select new role for this user:", fontSize = 13.sp, color = Color.Gray)
+                Box {
+                    OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Role: $selectedRole", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.weight(1f))
+                        Icon(Icons.Default.ArrowDropDown, null)
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        roles.forEach { r ->
+                            DropdownMenuItem(
+                                text = { Text(r, fontWeight = if (r == selectedRole) FontWeight.Bold else FontWeight.Normal) },
+                                onClick = {
+                                    selectedRole = r
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirmNewRole(selectedRole); onDismiss() },
+                colors = ButtonDefaults.buttonColors(containerColor = FStorePurple),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("UPDATE ROLE")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("CANCEL") }
+        }
+    )
+}
+
+@Composable
 fun OrderAnalyticsDetailsDialog(order: Order, onDismiss: () -> Unit) {
     val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
     AlertDialog(

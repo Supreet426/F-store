@@ -1,0 +1,247 @@
+<!-- FULL SCREEN MODAL / EDITOR PAGE: PROMO CARD STUDIO (MINI-BANNERS) -->
+<div id="modal-promo-card" class="fixed inset-0 z-[100] hidden bg-slate-950 flex flex-col w-screen h-screen overflow-hidden">
+
+    <!-- Top Full Width Header Bar -->
+    <header class="h-16 bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between shrink-0 shadow-xl">
+        <div class="flex items-center gap-3">
+            <button type="button" onclick="closePromoCardModal()" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors">
+                <i class="fa-solid fa-arrow-left text-sm"></i>
+            </button>
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold border border-cyan-500/30">
+                <i class="fa-solid fa-layer-group text-lg"></i>
+            </div>
+            <div>
+                <h3 class="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                    Promo Mini-Card Studio
+                    <span class="text-[9px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2.5 py-0.5 rounded-full font-bold uppercase">Sub-Hero Editor</span>
+                </h3>
+                <p class="text-xs text-slate-400 hidden sm:block">Design category spotlight cards shown directly below the main hero slider on customer homepage.</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button type="button" onclick="closePromoCardModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer hidden sm:block">
+                Cancel
+            </button>
+            <button type="button" onclick="handlePromoCardSubmit(event)" class="btn-primary bg-cyan-600 hover:bg-cyan-500 text-xs px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-cyan-600/30 cursor-pointer transition-all flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Save & Publish Card
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Two Columns Body -->
+    <div class="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-950">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            <!-- LEFT COLUMN: Live Preview Canvas & Presets (lg:col-span-5) -->
+            <div class="lg:col-span-5 space-y-6 lg:sticky lg:top-0">
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-eye text-cyan-400"></i> Card Canvas Live Preview
+                    </span>
+
+                    <!-- Live Mini Card Preview Box -->
+                    <div id="promo-card-live-preview-box" class="bg-gradient-to-br from-[#06b6d4] to-[#0891b2] rounded-3xl p-6 text-white flex justify-between items-center relative overflow-hidden shadow-xl border border-white/20 min-h-[140px]">
+                        <!-- Dynamic Content rendered by updatePromoCardLivePreview() -->
+                    </div>
+
+                    <!-- Preset Gradient Quick Themes -->
+                    <div class="pt-2">
+                        <label class="block text-xs font-semibold text-slate-400 mb-2">Theme Gradient Quick Pickers</label>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <button type="button" onclick="setPromoCardGradientPreset('from-[#06b6d4] to-[#0891b2]')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-cyan-500 to-cyan-700 border border-white/20 hover:scale-105 transition-transform truncate">Cyan Pharmacy</button>
+                            <button type="button" onclick="setPromoCardGradientPreset('from-[#f59e0b] to-[#d97706]')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-amber-500 to-amber-700 border border-white/20 hover:scale-105 transition-transform truncate">Amber Pet Care</button>
+                            <button type="button" onclick="setPromoCardGradientPreset('from-[#dbeafe] to-[#e0e7ff]')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-gray-900 bg-gradient-to-r from-blue-100 to-indigo-100 border border-slate-300 hover:scale-105 transition-transform truncate">Baby Soft Blue</button>
+                            <button type="button" onclick="setPromoCardGradientPreset('from-emerald-600 to-teal-800')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-800 border border-white/20 hover:scale-105 transition-transform truncate">Emerald Fresh</button>
+                            <button type="button" onclick="setPromoCardGradientPreset('from-rose-600 to-purple-800')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-rose-600 to-purple-800 border border-white/20 hover:scale-105 transition-transform truncate">Rose Purple</button>
+                            <button type="button" onclick="setPromoCardGradientPreset('from-slate-900 to-indigo-950')" class="px-3 py-2 text-[10px] font-bold rounded-xl text-white bg-gradient-to-r from-slate-900 to-indigo-950 border border-white/20 hover:scale-105 transition-transform truncate">Midnight Royal</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Form Controls (lg:col-span-7) -->
+            <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+                <form id="form-promo-card" class="space-y-6" onsubmit="handlePromoCardSubmit(event)">
+                    <input type="hidden" id="promo-card-id">
+
+                    <!-- Section 1: Copywriting & Text -->
+                    <div class="space-y-4">
+                        <h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-800">
+                            <i class="fa-solid fa-pen-nib"></i> 1. Card Copywriting & Colors
+                        </h4>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="promo-card-title-input" class="block text-xs font-semibold text-slate-300 mb-1">Card Headline Title *</label>
+                                <input type="text" id="promo-card-title-input" required oninput="updatePromoCardLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-cyan-500" placeholder="e.g., Pharmacy at your doorstep!">
+                            </div>
+                            <div>
+                                <label for="promo-card-subtitle-input" class="block text-xs font-semibold text-slate-300 mb-1">Subtitle / Subtext</label>
+                                <input type="text" id="promo-card-subtitle-input" oninput="updatePromoCardLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-cyan-500" placeholder="e.g., Cough syrups, pain relief sprays & more">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="promo-card-text-color-input" class="block text-xs font-semibold text-slate-300 mb-1">Text Color</label>
+                                <select id="promo-card-text-color-input" onchange="updatePromoCardLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl">
+                                    <option value="text-white">White Text</option>
+                                    <option value="text-gray-900">Dark Text (For Light Backgrounds)</option>
+                                    <option value="text-cyan-200">Cyan Glow</option>
+                                    <option value="text-amber-200">Amber Soft</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="promo-card-gradient-input" class="block text-xs font-semibold text-slate-300 mb-1">Gradient Theme Class</label>
+                                <input type="text" id="promo-card-gradient-input" oninput="updatePromoCardLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 font-mono rounded-xl focus:border-cyan-500" placeholder="from-[#06b6d4] to-[#0891b2]">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: CTA Button & Styling -->
+                    <div class="space-y-4 pt-2">
+                        <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-800">
+                            <i class="fa-solid fa-tag"></i> 2. CTA Button & Graphic Icon
+                        </h4>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="promo-card-cta-text-input" class="block text-xs font-semibold text-slate-300 mb-1">Button Label</label>
+                                <input type="text" id="promo-card-cta-text-input" oninput="updatePromoCardLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-amber-500" placeholder="e.g., Order Now, Shop Today">
+                            </div>
+                            <div>
+                                <label for="promo-card-cta-style-input" class="block text-xs font-semibold text-slate-300 mb-1">Button Style</label>
+                                <select id="promo-card-cta-style-input" onchange="updatePromoCardLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl">
+                                    <option value="bg-white text-cyan-900 font-extrabold text-xs px-4 py-2 rounded-lg shadow-sm w-fit group-hover:bg-cyan-50 transition">White Pill (Cyan Text)</option>
+                                    <option value="bg-[#18181b] text-white font-extrabold text-xs px-4 py-2 rounded-lg shadow-sm w-fit group-hover:bg-black transition">Dark Pill (White Text)</option>
+                                    <option value="bg-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-lg shadow-sm w-fit transition">Amber Gold Pill</option>
+                                    <option value="bg-emerald-500 text-slate-950 font-black text-xs px-4 py-2 rounded-lg shadow-sm w-fit transition">Neon Emerald</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="promo-card-image-url-input" class="block text-xs font-semibold text-slate-300 mb-1">Graphic Image / Icon URL *</label>
+                                <input type="url" id="promo-card-image-url-input" required oninput="updatePromoCardLivePreview()" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-amber-500" placeholder="https://cdn-icons-png.flaticon.com/512/3050/3050158.png">
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 mt-5">
+                                <label for="promo-card-invert-icon-input" class="text-xs font-bold text-white cursor-pointer">Invert Icon to White (`brightness-0 invert`)</label>
+                                <input type="checkbox" id="promo-card-invert-icon-input" checked onchange="updatePromoCardLivePreview()" class="w-5 h-5 rounded bg-slate-800 border-slate-700 text-cyan-600 focus:ring-cyan-500 cursor-pointer">
+                            </div>
+                        </div>
+
+                        <!-- 3D Image Geometry & Motion Controls -->
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                            <div>
+                                <label for="promo-card-image-scale-input" class="block text-[11px] font-semibold text-slate-300 mb-1">Image Size / Scale</label>
+                                <select id="promo-card-image-scale-input" onchange="updatePromoCardLivePreview()" class="input-field bg-slate-900 border-slate-700 text-white text-xs py-2 rounded-xl">
+                                    <option value="w-16 h-16">Compact (64px)</option>
+                                    <option value="w-20 h-20">Medium (80px)</option>
+                                    <option value="w-24 h-24" selected>Standard (96px)</option>
+                                    <option value="w-28 h-28">Large 3D (112px)</option>
+                                    <option value="w-32 h-32">Popout 3D (128px)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="promo-card-image-glow-input" class="block text-[11px] font-semibold text-slate-300 mb-1">3D Backdrop Glow</label>
+                                <select id="promo-card-image-glow-input" onchange="updatePromoCardLivePreview()" class="input-field bg-slate-900 border-slate-700 text-white text-xs py-2 rounded-xl">
+                                    <option value="none">No Glow</option>
+                                    <option value="glow-cyan" selected>Cyan Neon Glow</option>
+                                    <option value="glow-amber">Amber Sunburst</option>
+                                    <option value="glow-purple">Cyberpunk Purple</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="promo-card-image-effect-input" class="block text-[11px] font-semibold text-slate-300 mb-1">3D Hover Motion</label>
+                                <select id="promo-card-image-effect-input" onchange="updatePromoCardLivePreview()" class="input-field bg-slate-900 border-slate-700 text-white text-xs py-2 rounded-xl">
+                                    <option value="tilt_pop" selected>3D Tilt & Popout</option>
+                                    <option value="float">3D Floating Levitation</option>
+                                    <option value="zoom_rotate">3D Zoom & Rotate</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Destination Routing & Dark Store Targeting -->
+                    <div class="space-y-4 pt-2">
+                        <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-800">
+                            <i class="fa-solid fa-compass"></i> 3. Destination Routing & Dark Store Targeting
+                        </h4>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="promo-card-action-type-input" class="block text-xs font-semibold text-slate-300 mb-1">On-Click Action</label>
+                                <select id="promo-card-action-type-input" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-indigo-500">
+                                    <option value="category">Category Filter Page</option>
+                                    <option value="flash_sale">Flash Sale Deals Section</option>
+                                    <option value="external_url">External Website Link</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="promo-card-action-val-input" class="block text-xs font-semibold text-slate-300 mb-1">Target Category Name / Link</label>
+                                <input type="text" id="promo-card-action-val-input" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-indigo-500" placeholder="e.g., Pharma & Wellness, Pet Care, Baby Care">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="promo-card-city-input" class="block text-xs font-semibold text-slate-300 mb-1">Target City</label>
+                                <select id="promo-card-city-input" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-indigo-500">
+                                    <option value="All">All Cities (Global)</option>
+                                    <option value="Mumbai">Mumbai</option>
+                                    <option value="Delhi NCR">Delhi NCR</option>
+                                    <option value="Bengaluru">Bengaluru</option>
+                                    <option value="Hyderabad">Hyderabad</option>
+                                    <option value="Pune">Pune</option>
+                                    <option value="Chennai">Chennai</option>
+                                    <option value="Kolkata">Kolkata</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="promo-card-priority-input" class="block text-xs font-semibold text-slate-300 mb-1">Display Rank (1 = First Card, 2 = Middle, 3 = Third)</label>
+                                <input type="number" id="promo-card-priority-input" min="1" max="99" value="1" class="input-field bg-slate-800 border-slate-700 text-white text-xs py-3 rounded-xl focus:border-indigo-500">
+                            </div>
+                        </div>
+
+                        <!-- Dark Store Multi-Select -->
+                        <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                    <i class="fa-solid fa-store"></i> Dark Store Radius Targeting
+                                </label>
+                            </div>
+                            <div class="flex items-center gap-2 pb-2 border-b border-slate-800">
+                                <input type="checkbox" id="promo-darkstore-target-all" onchange="toggleAllPromoDarkStoreTargets(this.checked)" checked class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-cyan-600 focus:ring-cyan-500 cursor-pointer">
+                                <label for="promo-darkstore-target-all" class="text-xs font-bold text-white cursor-pointer">All Dark Stores (Global Coverage)</label>
+                            </div>
+                            <div id="promo-darkstore-checkboxes-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
+                                <!-- Dynamic checkboxes -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visibility & Submit -->
+                    <div class="flex items-center justify-between p-4 bg-emerald-950/30 border border-emerald-800/40 rounded-2xl">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="promo-card-active-input" checked class="w-5 h-5 rounded bg-slate-800 border-slate-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                            <label for="promo-card-active-input" class="text-xs font-bold text-white cursor-pointer">
+                                Publish Promo Card Immediately (Active)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button type="button" onclick="closePromoCardModal()" class="px-6 py-3 text-xs font-bold text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-primary bg-cyan-600 hover:bg-cyan-500 text-xs px-8 py-3 rounded-xl font-bold shadow-lg shadow-cyan-600/30 cursor-pointer transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i> Save & Publish Promo Card
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

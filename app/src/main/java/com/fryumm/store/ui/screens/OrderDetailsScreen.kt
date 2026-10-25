@@ -41,7 +41,7 @@ fun OrderDetailsScreen(
 ) {
     val order = viewModel.orders.find { it.id == orderId } ?: return
     val context = LocalContext.current
-    val merchant = viewModel.allUsers.find { it.uid == order.sellerId }
+    val merchant = viewModel.allUsers.find { it.uid == order.merchantId }
     val rider = viewModel.riders.find { it.id == order.deliveryAgentId }
     
     val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
@@ -125,7 +125,7 @@ fun OrderDetailsScreen(
                     title = "Merchant Details",
                     icon = Icons.Default.Store,
                     content = {
-                        InfoRow(label = "Store Name", value = merchant?.name ?: "Merchant ID: ${order.sellerId}")
+                        InfoRow(label = "Store Name", value = merchant?.name ?: "Merchant ID: ${order.merchantId}")
                         InfoRow(label = "Location", value = order.area)
                     }
                 )
@@ -309,7 +309,7 @@ fun RiderTrackingSection(
     val (targetLat, targetLng, targetLabel) = if (order.status == OrderStatus.DISPATCHED) {
         Triple(order.liveLat ?: 0.0, order.liveLng ?: 0.0, "Customer")
     } else {
-        Triple(order.sellerLatitude ?: storeConfig.storeLatitude, order.sellerLongitude ?: storeConfig.storeLongitude, "Store")
+        Triple(order.merchantLatitude ?: storeConfig.storeLatitude, order.merchantLongitude ?: storeConfig.storeLongitude, "Store")
     }
 
     if (targetLat == 0.0) return

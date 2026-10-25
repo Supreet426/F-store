@@ -81,6 +81,7 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.storage)
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.functions)
     implementation(libs.play.services.auth)
     implementation(libs.play.services.location)
     implementation(libs.coil.compose)

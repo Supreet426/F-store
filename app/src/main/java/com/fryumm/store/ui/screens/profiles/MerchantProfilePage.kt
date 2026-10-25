@@ -40,9 +40,9 @@ fun MerchantProfilePage(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val userOrders = viewModel.orders.filter { it.sellerId == profile.uid }
+    val userOrders = viewModel.orders.filter { it.merchantId == profile.uid }
     val merchantProducts = viewModel.products.filter {
-        it.sellerId == profile.uid || (it.sellerName.isNotBlank() && it.sellerName.equals(profile.tradeName, ignoreCase = true))
+        it.merchantId == profile.uid || (it.merchantName.isNotBlank() && it.merchantName.equals(profile.tradeName, ignoreCase = true))
     }
 
     val deliveredOrders = userOrders.filter { it.status == OrderStatus.DELIVERED }

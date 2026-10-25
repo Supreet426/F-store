@@ -414,7 +414,7 @@ fun ProductCard(
     var showScheduleDialog by remember { mutableStateOf(false) }
     
     // Find merchant name
-    val merchant = if (isAdmin) viewModel.allUsers.find { it.uid == product.sellerId } else null
+    val merchant = if (isAdmin) viewModel.allUsers.find { it.uid == product.merchantId } else null
 
     if (showDetailDialog) {
         ProductDetailDialog(

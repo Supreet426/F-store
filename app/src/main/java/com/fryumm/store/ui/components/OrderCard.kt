@@ -48,7 +48,7 @@ fun OrderCard(
     val isAdmin = viewModel.currentUserProfile?.userRole == UserRole.ADMIN
     val isStoreOwner = viewModel.currentUserProfile?.userRole == UserRole.STORE_OWNER
     val merchantName = if (isAdmin) {
-        viewModel.allUsers.find { it.uid == order.sellerId }?.name ?: "Unknown Merchant"
+        viewModel.allUsers.find { it.uid == order.merchantId }?.name ?: "Unknown Merchant"
     } else null
 
     var showCancelDialog by remember { mutableStateOf(false) }
@@ -430,7 +430,7 @@ fun HistoryLogItem(order: Order, viewModel: StoreViewModel) {
     val isAdmin = viewModel.currentUserProfile?.userRole == UserRole.ADMIN
     val isStoreOwner = viewModel.currentUserProfile?.userRole == UserRole.STORE_OWNER
     val merchantName = if (isAdmin) {
-        viewModel.allUsers.find { it.uid == order.sellerId }?.name ?: "Unknown Merchant"
+        viewModel.allUsers.find { it.uid == order.merchantId }?.name ?: "Unknown Merchant"
     } else null
 
     var showCancelDialog by remember { mutableStateOf(false) }

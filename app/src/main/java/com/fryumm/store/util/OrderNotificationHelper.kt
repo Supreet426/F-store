@@ -18,8 +18,8 @@ object OrderNotificationHelper {
      * 2. CUSTOMER / RIDER: Never receives merchant incoming order ring calls.
      * 3. DARK STORE / HUB STAFF: Notified if the order belongs to their assigned darkStoreId or if any item in the order is stocked in their hub.
      * 4. MERCHANT (Store Owner): Notified ONLY if:
-     *    - The order's primary sellerId matches the merchant's UID, OR
-     *    - At least one product in order.items was created/added under this merchant's ID (product.sellerId == merchant.uid).
+     *    - The order's primary merchantId matches the merchant's UID, OR
+     *    - At least one product in order.items was created/added under this merchant's ID (product.merchantId == merchant.uid).
      *
      * If none of these match, return false so other merchants are not disturbed or confused!
      */
@@ -42,13 +42,13 @@ object OrderNotificationHelper {
         // Rule 3: Dark Store Hub Manager/Staff check
         val userDarkStoreId = userProfile.darkStoreId
         if (!userDarkStoreId.isNullOrBlank()) {
-            if (order.sellerId == userDarkStoreId) return true
-            if (order.items.any { it.product.sellerId == userDarkStoreId }) return true
+            if (order.merchantId == userDarkStoreId) return true
+            if (order.items.any { it.product.merchantId == userDarkStoreId }) return true
         }
 
         // Rule 4: Merchant Product Ownership Check
-        if (order.sellerId == currentUserId) return true
-        if (order.items.any { it.product.sellerId == currentUserId }) return true
+        if (order.merchantId == currentUserId) return true
+        if (order.items.any { it.product.merchantId == currentUserId }) return true
 
         // Order does not contain any product from this merchant -> DO NOT DISTURB
         return false
@@ -62,8 +62,8 @@ object OrderNotificationHelper {
         userRole: UserRole,
         userEmail: String,
         userDarkStoreId: String?,
-        orderSellerId: String,
-        orderItemSellerIds: List<String>
+        orderMerchantId: String,
+        orderItemMerchantIds: List<String>
     ): Boolean {
         val emailLower = userEmail.lowercase().trim()
         val isAdmin = userRole == UserRole.ADMIN || MASTER_ADMIN_EMAILS.contains(emailLower)
@@ -72,12 +72,12 @@ object OrderNotificationHelper {
         if (userRole == UserRole.CUSTOMER || userRole == UserRole.RIDER) return false
 
         if (!userDarkStoreId.isNullOrBlank()) {
-            if (orderSellerId == userDarkStoreId) return true
-            if (orderItemSellerIds.contains(userDarkStoreId)) return true
+            if (orderMerchantId == userDarkStoreId) return true
+            if (orderItemMerchantIds.contains(userDarkStoreId)) return true
         }
 
-        if (orderSellerId == userUid) return true
-        if (orderItemSellerIds.contains(userUid)) return true
+        if (orderMerchantId == userUid) return true
+        if (orderItemMerchantIds.contains(userUid)) return true
 
         return false
     }

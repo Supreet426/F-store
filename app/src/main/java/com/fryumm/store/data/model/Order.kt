@@ -4,8 +4,8 @@ import com.google.firebase.firestore.PropertyName
 
 data class Order(
     val id: String = "",
-    val sellerId: String = "seller_1",
-    val sellerName: String = "Flash-O Seller",
+    val merchantId: String = "merchant_1",
+    val merchantName: String = "Flash-O Merchant",
     val items: List<CartItem> = emptyList(),
     val totalPrice: Double = 0.0,
     val totalAmount: Double = 0.0,
@@ -35,8 +35,8 @@ data class Order(
     val cancelledBy: String? = null,
     val cancellationReason: String? = null,
     val readyAt: Long? = null,
-    val sellerLatitude: Double? = null,
-    val sellerLongitude: Double? = null,
+    val merchantLatitude: Double? = null,
+    val merchantLongitude: Double? = null,
     val liveLat: Double? = null,
     val liveLng: Double? = null,
     val deliveryCharge: Double = 0.0,

@@ -34,6 +34,7 @@ fun UserActivityScreen(viewModel: StoreViewModel, navController: NavHostControll
     var selectedCustomerForDetails by remember { mutableStateOf<CustomerProfile?>(null) }
     var selectedOrderForDetails by remember { mutableStateOf<Order?>(null) }
     var showAddUserDialog by remember { mutableStateOf(false) }
+    var userForRoleChange by remember { mutableStateOf<Triple<String, String, String>?>(null) }
 
     // Notify parent of title changes based on current view
     LaunchedEffect(mainTab, selectedUserForDetails, selectedCustomerForDetails) {
@@ -110,6 +111,18 @@ fun UserActivityScreen(viewModel: StoreViewModel, navController: NavHostControll
         OrderAnalyticsDetailsDialog(
             order = selectedOrderForDetails!!,
             onDismiss = { selectedOrderForDetails = null }
+        )
+    }
+
+    if (userForRoleChange != null) {
+        RoleChangeDialog(
+            userName = userForRoleChange!!.second,
+            currentRole = userForRoleChange!!.third,
+            onDismiss = { userForRoleChange = null },
+            onConfirmNewRole = { newRole ->
+                viewModel.changeUserRole(userForRoleChange!!.first, newRole)
+                userForRoleChange = null
+            }
         )
     }
 
@@ -223,18 +236,21 @@ fun UserActivityScreen(viewModel: StoreViewModel, navController: NavHostControll
                     viewModel = viewModel,
                     searchQuery = searchQuery,
                     onCustomerClick = { selectedCustomerForDetails = it },
-                    onOrderClick = { selectedOrderForDetails = it }
+                    onOrderClick = { selectedOrderForDetails = it },
+                    onRoleChangeClick = { uid, name, role -> userForRoleChange = Triple(uid, name, role) }
                 )
                 "Riders", "Merchants" -> RiderMerchantTab(
                     viewModel = viewModel,
                     mainTab = mainTab,
                     filteredUsers = filteredUsers,
-                    onUserClick = { selectedUserForDetails = it }
+                    onUserClick = { selectedUserForDetails = it },
+                    onRoleChangeClick = { uid, name, role -> userForRoleChange = Triple(uid, name, role) }
                 )
                 else -> StaffAdminTab(
                     viewModel = viewModel,
                     filteredUsers = filteredUsers,
-                    onUserClick = { selectedUserForDetails = it }
+                    onUserClick = { selectedUserForDetails = it },
+                    onRoleChangeClick = { uid, name, role -> userForRoleChange = Triple(uid, name, role) }
                 )
             }
         }

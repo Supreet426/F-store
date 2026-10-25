@@ -268,8 +268,8 @@ class StoreViewModel @Inject constructor(
 
     private fun observeProducts() {
         viewModelScope.launch {
-            productRepository.getProducts().collect { list ->
-                rawProducts = list
+            productRepository.getProducts().collect { result ->
+                rawProducts = result.getOrDefault(emptyList())
                 filterProducts()
             }
         }
@@ -384,11 +384,11 @@ class StoreViewModel @Inject constructor(
                 else -> {
                     // MERCHANT or DARK STORE
                     rawOrders.filter { order ->
-                        order.sellerId == profile.uid ||
-                        (!profile.darkStoreId.isNullOrEmpty() && order.sellerId == profile.darkStoreId) ||
+                        order.merchantId == profile.uid ||
+                        (!profile.darkStoreId.isNullOrEmpty() && order.merchantId == profile.darkStoreId) ||
                         order.items.any { item ->
-                            item.product.sellerId == profile.uid ||
-                            (!profile.darkStoreId.isNullOrEmpty() && item.product.sellerId == profile.darkStoreId)
+                            item.product.merchantId == profile.uid ||
+                            (!profile.darkStoreId.isNullOrEmpty() && item.product.merchantId == profile.darkStoreId)
                         }
                     }
                 }
@@ -402,7 +402,7 @@ class StoreViewModel @Inject constructor(
         products = if (isAdmin) {
             rawProducts
         } else {
-            rawProducts.filter { it.sellerId == profile.uid }
+            rawProducts.filter { it.merchantId == profile.uid }
         }.sortedBy { it.sequenceNumber }
 
         // Update low stock list
@@ -419,7 +419,7 @@ class StoreViewModel @Inject constructor(
             lowStockProducts.forEach { product ->
                 if (!notifiedLowStockIds.contains(product.id) && product.stockQuantity <= product.minStockLevel) {
                     val title = "Low Stock Alert: ${product.name}"
-                    val body = "${product.name} is running low (${product.stockQuantity} remaining at ${product.sellerName})."
+                    val body = "${product.name} is running low (${product.stockQuantity} remaining at ${product.merchantName})."
                     notificationRepository.sendNotification(
                         userId = currentUserProfile?.uid ?: "",
                         title = title,
@@ -432,15 +432,15 @@ class StoreViewModel @Inject constructor(
         }
     }
 
-    fun remindSellerAboutStock(product: Product) {
+    fun remindMerchantAboutStock(product: Product) {
         viewModelScope.launch {
             notificationRepository.sendNotification(
-                userId = product.sellerId,
+                userId = product.merchantId,
                 title = "Restock Request: ${product.name}",
                 body = "Admin has noticed that ${product.name} is low on stock (${product.stockQuantity} units left). Please restock soon.",
                 actionUrl = "inventory"
             )
-            _uiEvent.emit(UiEvent.ShowSuccess("Reminder sent to ${product.sellerName}"))
+            _uiEvent.emit(UiEvent.ShowSuccess("Reminder sent to ${product.merchantName}"))
         }
     }
 
@@ -567,8 +567,8 @@ class StoreViewModel @Inject constructor(
             orderRepository.updateOrderFields(orderId, mapOf(
                 "status" to OrderStatus.READY,
                 "readyAt" to System.currentTimeMillis(),
-                "sellerLatitude" to currentUserProfile?.latitude,
-                "sellerLongitude" to currentUserProfile?.longitude
+                "merchantLatitude" to currentUserProfile?.latitude,
+                "merchantLongitude" to currentUserProfile?.longitude
             ))
         }
     }
@@ -1190,11 +1190,7 @@ class StoreViewModel @Inject constructor(
             eventImpactScore = event,
             surgeStatus = surge,
             activitySurgePercentage = (weather + event) * 5.0,
-            preparationPlan = currentAnalytics.preparationPlan?.copy(
-                estimatedLoadFactor = loadFactor,
-                suggestedRiders = (loadFactor * 5).toInt(),
-                suggestedPickers = (loadFactor * 3).toInt()
-            ) ?: PreparationPlan(
+            preparationPlan = currentAnalytics.preparationPlan.copy(
                 estimatedLoadFactor = loadFactor,
                 suggestedRiders = (loadFactor * 5).toInt(),
                 suggestedPickers = (loadFactor * 3).toInt()
@@ -1251,6 +1247,81 @@ class StoreViewModel @Inject constructor(
         }
     }
 
+    fun getLastOrderDateForUser(uid: String, email: String, phone: String): Long? {
+        val userOrders = orders.filter { 
+            it.merchantId == uid || it.deliveryAgentId == uid ||
+            (phone.isNotBlank() && it.phoneNumber == phone)
+        }
+        return userOrders.maxOfOrNull { it.timestamp }
+    }
+
+    fun changeUserRole(uid: String, newRole: String) {
+        viewModelScope.launch {
+            try {
+                val user = allUsers.find { it.uid == uid }
+                if (user != null) {
+                    val oldCollection = when(user.userRole) {
+                        UserRole.ADMIN -> "users"
+                        UserRole.RIDER -> "riders"
+                        UserRole.OTHER -> "staff"
+                        UserRole.CUSTOMER -> "customers"
+                        else -> "sellers"
+                    }
+                    val parsedRole = try { UserRole.valueOf(newRole.uppercase()) } catch(e: Exception) { UserRole.STORE_OWNER }
+                    val newCollection = when(parsedRole) {
+                        UserRole.ADMIN -> "users"
+                        UserRole.RIDER -> "riders"
+                        UserRole.OTHER -> "staff"
+                        UserRole.CUSTOMER -> "customers"
+                        else -> "sellers"
+                    }
+
+                    val updates = mapOf(
+                        "role" to newRole,
+                        "active" to true,
+                        "isActive" to true
+                    )
+
+                    if (oldCollection == newCollection) {
+                        firestore.collection(oldCollection).document(uid).update(updates).await()
+                    } else {
+                        val doc = firestore.collection(oldCollection).document(uid).get().await()
+                        if (doc.exists()) {
+                            val data = doc.data?.toMutableMap() ?: mutableMapOf()
+                            data.putAll(updates)
+                            firestore.collection(newCollection).document(uid).set(data).await()
+                            firestore.collection(oldCollection).document(uid).delete().await()
+                        }
+                    }
+                    _uiEvent.emit(UiEvent.ShowSuccess("Role changed to $newRole successfully"))
+                } else {
+                    val custDoc = firestore.collection("customers").document(uid).get().await()
+                    if (custDoc.exists()) {
+                        val parsedRole = try { UserRole.valueOf(newRole.uppercase()) } catch(e: Exception) { UserRole.STORE_OWNER }
+                        val newCollection = when(parsedRole) {
+                            UserRole.ADMIN -> "users"
+                            UserRole.RIDER -> "riders"
+                            UserRole.OTHER -> "staff"
+                            else -> "sellers"
+                        }
+                        val data = custDoc.data?.toMutableMap() ?: mutableMapOf()
+                        data["role"] = newRole
+                        data["name"] = data["name"] ?: ""
+                        data["email"] = data["email"] ?: ""
+                        data["phoneNumber"] = data["mobile"] ?: ""
+                        data["photoUrl"] = data["photoUrl"] ?: ""
+                        
+                        firestore.collection(newCollection).document(uid).set(data).await()
+                        firestore.collection("customers").document(uid).delete().await()
+                        _uiEvent.emit(UiEvent.ShowSuccess("Customer role changed to $newRole"))
+                    }
+                }
+            } catch (e: Exception) {
+                _uiEvent.emit(UiEvent.ShowError("Role change failed: ${e.message}"))
+            }
+        }
+    }
+
     fun sendPasswordResetEmail(email: String) {
         viewModelScope.launch {
             try {
@@ -1285,12 +1356,12 @@ class StoreViewModel @Inject constructor(
         val baseFunnelCount = totalSearches.coerceAtLeast(productViews).coerceAtLeast(totalOrdersCount)
 
         val funnel = listOf(
-            FunnelStep("Product Search", totalSearches, if (baseFunnelCount > 0) (totalSearches.toFloat() / baseFunnelCount * 100).coerceAtMost(100f) else 0f),
-            FunnelStep("Product Clicks", productViews, if (baseFunnelCount > 0) (productViews.toFloat() / baseFunnelCount * 100).coerceAtMost(100f) else 0f),
-            FunnelStep("Add to Cart", addToCarts, if (productViews > 0) (addToCarts.toFloat() / productViews * 100).coerceAtMost(100f) else if (baseFunnelCount > 0) (addToCarts.toFloat() / baseFunnelCount * 100) else 0f),
-            FunnelStep("Checkout Initiated", checkouts, if (addToCarts > 0) (checkouts.toFloat() / addToCarts * 100).coerceAtMost(100f) else 0f),
-            FunnelStep("Orders Placed", totalOrdersCount, if (checkouts > 0) (totalOrdersCount.toFloat() / checkouts * 100).coerceAtMost(100f) else 0f),
-            FunnelStep("Delivered", deliveredOrders, if (totalOrdersCount > 0) (deliveredOrders.toFloat() / totalOrdersCount * 100) else 0f)
+            FunnelStep("Product Search", totalSearches, if (baseFunnelCount > 0) (totalSearches.toDouble() / baseFunnelCount * 100).coerceAtMost(100.0) else 0.0),
+            FunnelStep("Product Clicks", productViews, if (baseFunnelCount > 0) (productViews.toDouble() / baseFunnelCount * 100).coerceAtMost(100.0) else 0.0),
+            FunnelStep("Add to Cart", addToCarts, if (productViews > 0) (addToCarts.toDouble() / productViews * 100).coerceAtMost(100.0) else if (baseFunnelCount > 0) (addToCarts.toDouble() / baseFunnelCount * 100) else 0.0),
+            FunnelStep("Checkout Initiated", checkouts, if (addToCarts > 0) (checkouts.toDouble() / addToCarts * 100).coerceAtMost(100.0) else 0.0),
+            FunnelStep("Orders Placed", totalOrdersCount, if (checkouts > 0) (totalOrdersCount.toDouble() / checkouts * 100).coerceAtMost(100.0) else 0.0),
+            FunnelStep("Delivered", deliveredOrders, if (totalOrdersCount > 0) (deliveredOrders.toDouble() / totalOrdersCount * 100) else 0.0)
         )
 
         val zeroSearches = targetSearches.filter { it.resultCount == 0 }
@@ -1867,16 +1938,16 @@ class StoreViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val trending = listOf(
-                    Product(name = "Amul Taaza Milk", category = "Dairy", price = 28.0, unit = "500ml", stockQuantity = 100, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
-                    Product(name = "Harvest Gold Bread", category = "Bakery", price = 45.0, unit = "400g", stockQuantity = 50, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
-                    Product(name = "Farm Fresh Eggs", category = "Dairy", price = 84.0, unit = "12 pcs", stockQuantity = 30, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
-                    Product(name = "Basmati Rice", category = "Grocery", price = 120.0, unit = "1kg", stockQuantity = 200, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
-                    Product(name = "Maggi Noodles", category = "Snacks", price = 14.0, unit = "70g", stockQuantity = 500, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
-                    Product(name = "Fortune Soya Oil", category = "Grocery", price = 155.0, unit = "1L", stockQuantity = 150, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
-                    Product(name = "Coca-Cola", category = "Beverages", price = 40.0, unit = "750ml", stockQuantity = 100, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
-                    Product(name = "Tata Salt", category = "Grocery", price = 25.0, unit = "1kg", stockQuantity = 300, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
-                    Product(name = "Red Label Tea", category = "Beverages", price = 145.0, unit = "250g", stockQuantity = 80, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin"),
-                    Product(name = "Surf Excel Bar", category = "Household", price = 10.0, unit = "1 unit", stockQuantity = 400, isVerified = true, isAvailable = true, sellerId = currentUserProfile?.uid ?: "admin")
+                    Product(name = "Amul Taaza Milk", category = "Dairy", price = 28.0, unit = "500ml", stockQuantity = 100, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Harvest Gold Bread", category = "Bakery", price = 45.0, unit = "400g", stockQuantity = 50, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Farm Fresh Eggs", category = "Dairy", price = 84.0, unit = "12 pcs", stockQuantity = 30, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Basmati Rice", category = "Grocery", price = 120.0, unit = "1kg", stockQuantity = 200, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Maggi Noodles", category = "Snacks", price = 14.0, unit = "70g", stockQuantity = 500, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Fortune Soya Oil", category = "Grocery", price = 155.0, unit = "1L", stockQuantity = 150, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Coca-Cola", category = "Beverages", price = 40.0, unit = "750ml", stockQuantity = 100, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Tata Salt", category = "Grocery", price = 25.0, unit = "1kg", stockQuantity = 300, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Red Label Tea", category = "Beverages", price = 145.0, unit = "250g", stockQuantity = 80, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin"),
+                    Product(name = "Surf Excel Bar", category = "Household", price = 10.0, unit = "1 unit", stockQuantity = 400, isVerified = true, isAvailable = true, merchantId = currentUserProfile?.uid ?: "admin")
                 )
                 
                 val batch = firestore.batch()
@@ -2142,7 +2213,7 @@ class StoreViewModel @Inject constructor(
                                     name = tokens[0].trim(),
                                     category = tokens[1].trim(),
                                     price = tokens[2].trim().toDoubleOrNull() ?: 0.0,
-                                    sellerId = currentUserProfile?.uid ?: ""
+                                    merchantId = currentUserProfile?.uid ?: ""
                                 )
                             )
                         }
@@ -2173,7 +2244,7 @@ class StoreViewModel @Inject constructor(
                         price = obj.optDouble("price", 0.0),
                         unit = obj.optString("unit", "1 unit"),
                         stockQuantity = obj.optInt("stockQuantity", 0),
-                        sellerId = currentUserProfile?.uid ?: "admin",
+                        merchantId = currentUserProfile?.uid ?: "admin",
                         isVerified = true,
                         isAvailable = true
                     ))
@@ -2343,9 +2414,9 @@ class StoreViewModel @Inject constructor(
         val deliveredOrders = orders.filter { it.status == OrderStatus.DELIVERED }
         if (deliveredOrders.isEmpty()) return emptyList()
 
-        val groupedByMerchant = deliveredOrders.groupBy { it.sellerId }
-        return groupedByMerchant.map { (sellerId, merchantOrders) ->
-            val merchantName = allUsers.find { it.uid == sellerId }?.name ?: "Store #$sellerId"
+        val groupedByMerchant = deliveredOrders.groupBy { it.merchantId }
+        return groupedByMerchant.map { (merchantId, merchantOrders) ->
+            val merchantName = allUsers.find { it.uid == merchantId }?.name ?: "Store #$merchantId"
             val settlementItems = mutableListOf<SettlementItem>()
 
             merchantOrders.flatMap { it.items }.groupBy { it.product.id }.forEach { (productId, items) ->
@@ -2365,7 +2436,7 @@ class StoreViewModel @Inject constructor(
             }
 
             MerchantSettlement(
-                merchantId = sellerId,
+                merchantId = merchantId,
                 merchantName = merchantName,
                 items = settlementItems,
                 totalPayout = settlementItems.sumOf { it.totalAmount },

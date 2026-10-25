@@ -1,0 +1,37 @@
+<!-- MODAL: OTHER APP -->
+<div id="modal-other-app" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+        <h3 id="modal-other-app-title" class="text-lg font-bold text-white">Add Companion App</h3>
+        <form id="form-other-app" class="space-y-4">
+            <input type="hidden" id="other-app-id">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="other-app-name">App Name</label>
+                <input type="text" id="other-app-name" required class="input-field" placeholder="PT Player / Flasho Cab / Medico">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="other-app-category">Category / Tag</label>
+                <input type="text" id="other-app-category" required class="input-field" placeholder="Media & Video / Transport / Healthcare / News">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="other-app-subtitle">Subtitle / Description</label>
+                <textarea id="other-app-subtitle" rows="2" required class="input-field" placeholder="High-performance media player supporting all formats..."></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="other-app-icon">Icon CSS Class (FontAwesome)</label>
+                <input type="text" id="other-app-icon" class="input-field" placeholder="fas fa-play-circle or fas fa-car-side">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="other-app-url">Download / APK URL</label>
+                <input type="url" id="other-app-url" required class="input-field" placeholder="https://...">
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="other-app-active" checked class="w-4 h-4 rounded accent-brand-500 cursor-pointer">
+                <label for="other-app-active" class="text-xs font-semibold text-white cursor-pointer">Active & Visible in Portal</label>
+            </div>
+            <div class="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                <button type="button" onclick="closeOtherAppModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white cursor-pointer">Cancel</button>
+                <button type="submit" class="btn-primary text-xs px-5 py-2 cursor-pointer">Save Companion App</button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,64 @@
+<!-- MODAL: WEB CATEGORY EDITOR -->
+<div id="modal-category" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <h3 id="modal-category-title" class="text-lg font-bold text-white"><i class="fa-solid fa-layer-group text-sky-400 mr-2"></i>Add Category</h3>
+            <button type="button" onclick="closeCategoryModal()" class="text-slate-400 hover:text-white p-1 cursor-pointer">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form id="form-category" onsubmit="saveWebCategory(event)" class="space-y-4">
+            <input type="hidden" id="cat-id">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="cat-name">Category Name</label>
+                <input type="text" id="cat-name" required class="input-field" placeholder="e.g. Dairy, Bread & Eggs">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="cat-badge-text">Badge Text (Optional)</label>
+                    <input type="text" id="cat-badge-text" class="input-field" placeholder="e.g. HOT, 50% OFF, FRESH">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1" for="cat-badge-color">Badge Color Hex</label>
+                    <input type="text" id="cat-badge-color" class="input-field" placeholder="#FF1744">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="cat-image-url">Thumbnail Image URL</label>
+                <input type="url" id="cat-image-url" class="input-field" placeholder="https://cdn-icons-png.flaticon.com/...">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="cat-banner-url">Hero Banner Image URL (Optional)</label>
+                <input type="url" id="cat-banner-url" class="input-field" placeholder="https://images.unsplash.com/...">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1" for="cat-display-order">Display Priority Order</label>
+                <input type="number" id="cat-display-order" required class="input-field" value="1" placeholder="1">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Target Platforms</label>
+                <div class="flex items-center gap-4 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input type="checkbox" id="cat-platform-mobile" checked class="w-4 h-4 rounded bg-slate-800 accent-indigo-500">
+                        Mobile App
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input type="checkbox" id="cat-platform-web" checked class="w-4 h-4 rounded bg-slate-800 accent-indigo-500">
+                        Web Portal
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeCategoryModal()" class="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white cursor-pointer">Cancel</button>
+                <button type="submit" class="btn-primary text-xs px-5 py-2 cursor-pointer">Save Category</button>
+            </div>
+        </form>
+    </div>
+</div>

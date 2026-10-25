@@ -49,7 +49,7 @@ class OrderRepository @Inject constructor(
                             val customerName = doc.getString("customerName") ?: doc.getString("userName") ?: doc.getString("name") ?: "Unknown"
                             val amount = doc.getDouble("totalAmount") ?: doc.getDouble("totalPrice") ?: doc.getDouble("amount") ?: doc.getDouble("total") ?: 0.0
                             val time = doc.getLong("timestamp") ?: doc.getLong("date") ?: System.currentTimeMillis()
-                            val sellerId = doc.getString("sellerId") ?: doc.getString("merchantId") ?: doc.getString("storeId") ?: "seller_1"
+                            val merchantId = doc.getString("merchantId") ?: doc.getString("sellerId") ?: doc.getString("storeId") ?: "merchant_1"
                             
                             ordersList.add(Order(
                                 id = id,
@@ -57,7 +57,7 @@ class OrderRepository @Inject constructor(
                                 customerName = customerName,
                                 totalAmount = amount,
                                 timestamp = if (time > 0) time else System.currentTimeMillis(),
-                                sellerId = sellerId
+                                merchantId = merchantId
                             ))
                         }
                     } catch (e: Exception) {

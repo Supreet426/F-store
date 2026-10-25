@@ -15,7 +15,8 @@ import com.fryumm.store.data.model.UserProfile
 fun StaffAdminTab(
     viewModel: StoreViewModel,
     filteredUsers: List<UserProfile>,
-    onUserClick: (UserProfile) -> Unit
+    onUserClick: (UserProfile) -> Unit,
+    onRoleChangeClick: (String, String, String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -25,8 +26,9 @@ fun StaffAdminTab(
         items(filteredUsers) { user ->
             UserListItem(
                 user = user, 
+                viewModel = viewModel,
                 onClick = { onUserClick(user) },
-                onStatusChange = { viewModel.updateUserStatus(user.uid, it) }
+                onRoleChangeClick = { onRoleChangeClick(user.uid, user.name, user.role) }
             )
         }
     }

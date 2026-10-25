@@ -278,7 +278,7 @@ fun DarkStoreManagementScreen(viewModel: StoreViewModel, onBack: () -> Unit) {
                             it.darkStoreId == store.id || store.assignedRiderIds.contains(it.uid)
                         }
                         val hubProductsCount = viewModel.products.count { prod ->
-                            hubMerchants.any { m -> m.uid == prod.sellerId }
+                            hubMerchants.any { m -> m.uid == prod.merchantId }
                         }
 
                         DarkStoreCardFull(
@@ -1241,7 +1241,7 @@ fun EditDarkStoreFullScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 filteredMerchantsList.forEach { merchant ->
                                     val isAssigned = assignedMerchantIds.contains(merchant.uid)
-                                    val merchantProductsCount = allProducts.count { it.sellerId == merchant.uid }
+                                    val merchantProductsCount = allProducts.count { it.merchantId == merchant.uid }
 
                                     Surface(
                                         color = if (isAssigned) Color(0xFFF3E5F5) else Color(0xFFFAFAFA),

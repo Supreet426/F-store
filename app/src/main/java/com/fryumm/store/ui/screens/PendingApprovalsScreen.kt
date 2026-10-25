@@ -107,7 +107,7 @@ fun PendingApprovalsScreen(
             text = {
                 Column {
                     Text(prod.name, fontWeight = FontWeight.Bold, color = FStorePurple, fontSize = 16.sp)
-                    Text("Seller: ${prod.sellerName} | Price: ₹${prod.price}", fontSize = 12.sp, color = Color.Gray)
+                    Text("Merchant: ${prod.merchantName} | Price: ₹${prod.price}", fontSize = 12.sp, color = Color.Gray)
                     Spacer(Modifier.height(12.dp))
 
                     if (!isRejecting) {
@@ -445,7 +445,7 @@ fun PendingProductCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(product.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
-                Text("Category: ${product.category} | Seller: ${product.sellerName}", fontSize = 11.sp, color = Color.Gray)
+                Text("Category: ${product.category} | Merchant: ${product.merchantName}", fontSize = 11.sp, color = Color.Gray)
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("MRP: ₹${product.originalPrice}", fontSize = 11.sp, color = Color.Gray, style = androidx.compose.ui.text.TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough))

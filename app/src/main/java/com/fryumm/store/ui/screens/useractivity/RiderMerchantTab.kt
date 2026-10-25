@@ -25,7 +25,8 @@ fun RiderMerchantTab(
     viewModel: StoreViewModel,
     mainTab: String,
     filteredUsers: List<UserProfile>,
-    onUserClick: (UserProfile) -> Unit
+    onUserClick: (UserProfile) -> Unit,
+    onRoleChangeClick: (String, String, String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -80,21 +81,19 @@ fun RiderMerchantTab(
 
         items(filteredUsers) { user ->
             if (mainTab == "Riders") {
-                val analytics = viewModel.getAdvancedAnalytics()
-                val performance = analytics.riderPerformance.find { it.riderId == user.uid }
                 RiderManagementCard(
                     rider = user,
-                    performance = performance,
+                    viewModel = viewModel,
                     onClick = { onUserClick(user) },
-                    onStatusChange = { isActive -> viewModel.updateUserStatus(user.uid, isActive) }
+                    onRoleChangeClick = { onRoleChangeClick(user.uid, user.name, user.role) }
                 )
             } else if (mainTab == "Merchants") {
                  StoreManagementCard(
                     user = user,
                     darkStores = viewModel.darkStores,
-                    onAssignHub = { hubId -> viewModel.assignMerchantToDarkStore(user.uid, hubId) },
+                    viewModel = viewModel,
                     onClick = { onUserClick(user) },
-                    onStatusChange = { viewModel.updateUserStatus(user.uid, it) }
+                    onRoleChangeClick = { onRoleChangeClick(user.uid, user.name, user.role) }
                 )
             }
         }

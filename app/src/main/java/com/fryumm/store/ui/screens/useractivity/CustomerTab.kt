@@ -25,7 +25,8 @@ fun CustomerTab(
     viewModel: StoreViewModel,
     searchQuery: String,
     onCustomerClick: (CustomerProfile) -> Unit,
-    onOrderClick: (Order) -> Unit
+    onOrderClick: (Order) -> Unit,
+    onRoleChangeClick: (String, String, String) -> Unit
 ) {
     val customerStats = viewModel.getCustomerSummaryStats()
     val customerAnalysis = viewModel.getCustomerAnalysis()
@@ -101,7 +102,12 @@ fun CustomerTab(
 
             if (selectedFilter !in listOf("Fraud Detection", "Business KPIs", "Marketing", "Order Analytics")) {
                 items(filteredCustomers) { customer ->
-                    CustomerListItem(customer, onClick = { onCustomerClick(customer) })
+                    CustomerListItem(
+                        customer = customer,
+                        viewModel = viewModel,
+                        onClick = { onCustomerClick(customer) },
+                        onRoleChangeClick = { onRoleChangeClick(customer.id, customer.name, "CUSTOMER") }
+                    )
                 }
             }
             

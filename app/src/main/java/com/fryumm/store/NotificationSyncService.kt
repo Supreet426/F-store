@@ -157,7 +157,7 @@ class NotificationSyncService : Service() {
 
                             val email = currentUserProfile?.email?.lowercase() ?: ""
                             val isAdmin = OrderNotificationHelper.MASTER_ADMIN_EMAILS.contains(email) || currentUserProfile?.userRole?.name == "ADMIN"
-                            val isAssignedDarkStore = currentUserProfile?.darkStoreId?.isNotEmpty() == true && currentUserProfile?.darkStoreId == order.sellerId
+                            val isAssignedDarkStore = currentUserProfile?.darkStoreId?.isNotEmpty() == true && currentUserProfile?.darkStoreId == order.merchantId
 
                             if (isAdmin || isAssignedDarkStore) {
                                 triggerCallScreen(order)
@@ -242,9 +242,9 @@ class NotificationSyncService : Service() {
         val darkStoreId = profile?.darkStoreId ?: ""
 
         val merchantItems = order.items.filter {
-            it.product.sellerId == currentUid ||
-            order.sellerId == currentUid ||
-            (darkStoreId.isNotEmpty() && (it.product.sellerId == darkStoreId || order.sellerId == darkStoreId))
+            it.product.merchantId == currentUid ||
+            order.merchantId == currentUid ||
+            (darkStoreId.isNotEmpty() && (it.product.merchantId == darkStoreId || order.merchantId == darkStoreId))
         }
 
         val relevantItems = if (merchantItems.isNotEmpty()) merchantItems else order.items
