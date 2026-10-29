@@ -5,7 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -594,10 +594,11 @@ fun MerchantProfilePage(
                                 verticalArrangement = Arrangement.spacedBy(10.dp),
                                 contentPadding = PaddingValues(bottom = 24.dp)
                             ) {
-                                items(merchantProducts, key = { it.id }) { product ->
+                                itemsIndexed(merchantProducts, key = { _, product -> product.id }) { index, product ->
                                     ProductCard(
                                         product = product,
                                         viewModel = viewModel,
+                                        serialNumber = index + 1,
                                         onEditClick = { }
                                     )
                                 }

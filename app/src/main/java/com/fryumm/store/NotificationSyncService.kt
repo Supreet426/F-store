@@ -85,7 +85,7 @@ class NotificationSyncService : Service() {
 
     private fun fetchAndObserveUserProfile(uid: String, onFetched: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
-            val collections = listOf("sellers", "users", "staff", "riders", "customers")
+            val collections = listOf("merchants", "users", "staff", "riders", "customers")
             for (coll in collections) {
                 try {
                     val doc = firestore.collection(coll).document(uid).get().await()

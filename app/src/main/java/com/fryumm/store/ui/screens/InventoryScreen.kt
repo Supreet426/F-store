@@ -6,7 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -222,8 +222,8 @@ fun InventoryScreen(navController: NavHostController, viewModel: StoreViewModel)
                     }
                 }
 
-                items(displayProducts, key = { it.id }) { product ->
-                    ProductCard(product, viewModel, onEditClick = {
+                itemsIndexed(displayProducts, key = { _, product -> product.id }) { index, product ->
+                    ProductCard(product, viewModel, serialNumber = index + 1, onEditClick = {
                         navController.navigate("edit_product/${product.id}")
                     })
                 }

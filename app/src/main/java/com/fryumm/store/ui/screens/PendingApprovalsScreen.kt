@@ -39,12 +39,13 @@ fun PendingApprovalsScreen(
     navController: NavHostController,
     onBack: () -> Unit
 ) {
-    val allProducts = viewModel.products
     val allUsers = viewModel.allUsers
     val allCustomers = viewModel.allCustomers
 
     // Filter Pending Items per category
-    val pendingProducts = remember(allProducts) { allProducts.filter { !it.isVerified } }
+    val pendingProducts = viewModel.pendingReviewProducts
+    val pendingProductsLoading = viewModel.pendingProductsLoading
+    val pendingProductsError = viewModel.pendingProductsError
     val pendingMerchants = remember(allUsers) {
         allUsers.filter { (it.userRole == UserRole.STORE_OWNER || it.userRole == UserRole.MERCHANT) && (!it.active || it.blockReason?.contains("Pending Verification") == true) }
     }
@@ -249,20 +250,43 @@ fun PendingApprovalsScreen(
             when (selectedTab) {
                 // 1. Products Approvals
                 0 -> {
-                    if (pendingProducts.isEmpty()) {
-                        EmptyStateCard("No Pending Products", "All submitted products have been verified.")
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            items(pendingProducts, key = { it.id }) { product ->
-                                PendingProductCard(
-                                    product = product,
-                                    viewModel = viewModel,
-                                    onApprove = { selectedProductForApproval = product },
-                                    onEdit = { navController.navigate("edit_product/${product.id}") }
-                                )
+                    when {
+                        pendingProductsLoading -> {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = FStorePurple)
+                            }
+                        }
+                        pendingProductsError != null -> {
+                            Column(
+                                modifier = Modifier.fillMaxSize().padding(24.dp),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(Icons.Default.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp))
+                                Spacer(Modifier.height(8.dp))
+                                Text("Failed to Load Approval Queue", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                Text(pendingProductsError, fontSize = 13.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                                Button(onClick = { viewModel.loadPendingProductsForReview() }) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+                        pendingProducts.isEmpty() -> {
+                            EmptyStateCard("No Pending Products", "All submitted products have been verified.")
+                        }
+                        else -> {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(pendingProducts, key = { it.id }) { product ->
+                                    PendingProductCard(
+                                        product = product,
+                                        viewModel = viewModel,
+                                        onApprove = { selectedProductForApproval = product },
+                                        onEdit = { navController.navigate("edit_product/${product.id}") }
+                                    )
+                                }
                             }
                         }
                     }

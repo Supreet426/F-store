@@ -200,7 +200,7 @@ class ConfigViewModel @Inject constructor(
     fun assignMerchantToDarkStore(merchantId: String, darkStoreId: String?) {
         viewModelScope.launch {
             try {
-                firestore.collection("sellers").document(merchantId).update("darkStoreId", darkStoreId).await()
+                firestore.collection("merchants").document(merchantId).update("darkStoreId", darkStoreId).await()
 
                 darkStores.forEach { ds ->
                     val newList = ds.assignedMerchantIds.toMutableList()

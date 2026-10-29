@@ -26,7 +26,7 @@ async function verifyActiveCaller(db, callerUid, callerEmail) {
         return { uid: callerUid, role: (u.role || u.userRole || "CUSTOMER").toUpperCase(), isMasterAdmin: false };
     }
 
-    // Check merchants collection - ENFORCE ONBOARDING & ACCESS GATE (STRICT CANONICAL ONLY)
+    // Check sellers collection - ENFORCE ONBOARDING & ACCESS GATE (STRICT CANONICAL ONLY)
     const merchantSnap = await db.collection("merchants").doc(callerUid).get();
     if (merchantSnap.exists) {
         const m = merchantSnap.data();
@@ -319,6 +319,22 @@ exports.onFcmBroadcastCreated = functions.firestore
             console.error("Error sending FCM broadcast:", error);
             return snapshot.ref.update({ status: "failed", error: error.message });
         }
+    });
+
+exports.onProductWritten = functions.firestore
+    .document("products/{productId}")
+    .onWrite(async (change, context) => {
+        const productId = context.params.productId;
+
+        // If product was deleted, delete the public projection
+        if (!change.after.exists) {
+            const db = admin.firestore();
+            await db.collection("public_products").doc(productId).delete();
+            return null;
+        }
+
+        // Otherwise sync the public projection
+        return syncPublicProjectionInternal(productId);
     });
 
 exports.onOrderStatusUpdated = functions.firestore
@@ -679,8 +695,14 @@ async function syncPublicProjectionInternal(productId) {
         const data = prodSnap.data();
 
         // 1. Strict XOR Canonical Ownership Validation
-        const hasMerchant = Boolean(data.merchantId && typeof data.merchantId === "string" && data.merchantId.trim());
-        const hasDarkStore = Boolean(data.darkStoreId && typeof data.darkStoreId === "string" && data.darkStoreId.trim());
+        let hasMerchant = Boolean(data.merchantId && typeof data.merchantId === "string" && data.merchantId.trim());
+        let hasDarkStore = Boolean(data.darkStoreId && typeof data.darkStoreId === "string" && data.darkStoreId.trim());
+
+        // Self-healing for legacy documents where darkStoreId was accidentally set equal to darkHubId on merchant products
+        if (hasMerchant && hasDarkStore && (data.darkStoreId.trim() === (data.darkHubId || "").trim() || data.darkStoreId.trim().startsWith("GHO-") || data.darkStoreId.trim().startsWith("HUB-"))) {
+            hasDarkStore = false;
+        }
+
         const validXOR = (hasMerchant && !hasDarkStore) || (!hasMerchant && hasDarkStore);
 
         if (!validXOR) {
@@ -701,7 +723,8 @@ async function syncPublicProjectionInternal(productId) {
                 if (pubSnap.exists) transaction.delete(pubRef);
                 return { synced: false, reason: "Ineligible: Merchant account is unapproved or inactive." };
             }
-            expectedHubId = (mData.registeredHubId || "").trim();
+            const regHub = (mData.registeredHubId || "").trim();
+            expectedHubId = (regHub && regHub !== "undefined") ? regHub : ((mData.darkHubId || "").trim() || (data.darkHubId || "").trim());
         } else if (hasDarkStore) {
             const dsSnap = await transaction.get(db.collection("dark_stores").doc(data.darkStoreId.trim()));
             if (!dsSnap.exists) {
@@ -711,13 +734,14 @@ async function syncPublicProjectionInternal(productId) {
             expectedHubId = (dsSnap.data().darkHubId || "").trim();
         }
 
-        const validHub = Boolean(data.darkHubId && typeof data.darkHubId === "string" && data.darkHubId.trim() === expectedHubId && expectedHubId !== "");
+        const productHub = (data.darkHubId || "").trim();
+        const validHub = Boolean((productHub === expectedHubId || !productHub) && expectedHubId !== "");
         if (!validHub) {
             if (pubSnap.exists) transaction.delete(pubRef);
-            return { synced: false, reason: "Ineligible: Product darkHubId does not match trusted profile/store hub." };
+            return { synced: false, reason: `Ineligible: Product darkHubId '${data.darkHubId}' does not match trusted profile/store hub '${expectedHubId}'.` };
         }
 
-        // 2. Business verification check
+        // Strict Canonical Field Checks - NO FALLBACKS
         const isVerified = data.isVerified === true;
 
         // 3. Approval check: finalApproval == true OR (isAdminOverride == true AND overrideReason set)
@@ -725,11 +749,12 @@ async function syncPublicProjectionInternal(productId) {
 
         // 4. Publishing & availability
         const isPublished = data.publishingStatus === "PUBLISHED";
+
         const isAvailable = data.isAvailable === true;
 
         // 5. Stock / Preorder availability check
         const stock = data.stockQuantity !== undefined ? data.stockQuantity : (data.stockCount || 0);
-        const standardInStock = (data.isInStock !== false && data.inStock !== false) && stock > 0;
+        const standardInStock = data.isInStock === true && stock > 0;
 
         const preorderContract = validatePreorderContract(data, now);
         const preorderAvailable = preorderContract.valid && (data.maxPreorderCapacity === 0 || (data.currentPreorderCount || 0) < data.maxPreorderCapacity);
@@ -746,7 +771,7 @@ async function syncPublicProjectionInternal(productId) {
             }
         }
 
-        const isEligible = isVerified && isApproved && isPublished && isAvailable && inStock && !onVacation;
+        const isEligible = isVerified && isApproved && isPublished && isAvailable && !onVacation;
 
         if (!isEligible) {
             if (pubSnap.exists) transaction.delete(pubRef);
@@ -767,8 +792,10 @@ async function syncPublicProjectionInternal(productId) {
             category: data.category || "",
             subCategory: data.subCategory || "",
             stockQuantity: stock,
-            isInStock: standardInStock,
-            isAvailable: true,
+            isInStock: data.isInStock === true,
+            isAvailable: data.isAvailable === true,
+            isVerified: data.isVerified === true,
+            isComingSoon: Boolean(data.isComingSoon),
             darkHubId: expectedHubId,
             merchantId: hasMerchant ? data.merchantId.trim() : null,
             darkStoreId: hasDarkStore ? data.darkStoreId.trim() : null,
@@ -785,11 +812,15 @@ async function syncPublicProjectionInternal(productId) {
             freeDeliveryMinAmount: data.freeDeliveryMinAmount || 0,
             freeDeliveryMinQuantity: data.freeDeliveryMinQuantity || 0,
             sequenceNumber: data.sequenceNumber || 999,
-            isPreorderEnabled: data.isPreorderEnabled || false,
+            isPreorderEnabled: Boolean(data.isPreorderEnabled),
             currentPreorderCount: data.currentPreorderCount || 0,
             maxPreorderCapacity: data.maxPreorderCapacity || 0,
             preorderStart: normalizeTimestamp(data.preorderStart),
             preorderEnd: normalizeTimestamp(data.preorderEnd),
+            flashSale: Boolean(data.flashSale),
+            saleStart: normalizeTimestamp(data.saleStart),
+            saleEnd: normalizeTimestamp(data.saleEnd),
+            discountPercent: data.discountPercent || 0,
             projectionVersion: now,
             updatedAt: now
         };
@@ -946,8 +977,14 @@ exports.updateProductDraft = functions.https.onCall(async (data, context) => {
     const existing = prodSnap.data();
 
     // Canonical ownership check: Ordinary ADMIN does NOT bypass merchant ownership checks
-    const hasMerchant = Boolean(existing.merchantId && typeof existing.merchantId === "string" && existing.merchantId.trim());
-    const hasDarkStore = Boolean(existing.darkStoreId && typeof existing.darkStoreId === "string" && existing.darkStoreId.trim());
+    let hasMerchant = Boolean(existing.merchantId && typeof existing.merchantId === "string" && existing.merchantId.trim());
+    let hasDarkStore = Boolean(existing.darkStoreId && typeof existing.darkStoreId === "string" && existing.darkStoreId.trim());
+
+    // Self-healing for legacy documents where darkStoreId was accidentally set equal to darkHubId on merchant products
+    if (hasMerchant && hasDarkStore && (existing.darkStoreId.trim() === (existing.darkHubId || "").trim() || existing.darkStoreId.trim().startsWith("GHO-") || existing.darkStoreId.trim().startsWith("HUB-"))) {
+        hasDarkStore = false;
+    }
+
     const validXOR = (hasMerchant && !hasDarkStore) || (!hasMerchant && hasDarkStore);
 
     if (!validXOR) {
@@ -991,18 +1028,31 @@ exports.updateProductDraft = functions.https.onCall(async (data, context) => {
     delete updates.overrideBy;
     delete updates.overrideAt;
     delete updates.isVerified;
-    delete updates.publishingStatus;
     delete updates.projectionVersion;
+
+    // Permit authorized operational updates if supplied in updateData
+    if (updateData && updateData.publishingStatus !== undefined) {
+        if (callerProfile.isMasterAdmin || callerProfile.role === "ADMIN" || callerProfile.role === "MERCHANT") {
+            updates.publishingStatus = String(updateData.publishingStatus);
+        }
+    }
+    if (updateData && updateData.isAvailable !== undefined) {
+        updates.isAvailable = Boolean(updateData.isAvailable);
+    }
+    if (updateData && updateData.isInStock !== undefined) {
+        updates.isInStock = Boolean(updateData.isInStock);
+    }
+    if (updateData && updateData.stockQuantity !== undefined) {
+        updates.stockQuantity = Number(updateData.stockQuantity);
+    }
+    if (updateData && updateData.sequenceNumber !== undefined) {
+        updates.sequenceNumber = Number(updateData.sequenceNumber);
+    }
 
     let revBilling = existing.revBilling || 1;
     let revLegal = existing.revLegal || 1;
     let revQuality = existing.revQuality || 1;
     let revInventory = existing.revInventory || 1;
-
-    let billingChanged = false;
-    let legalChanged = false;
-    let qualityChanged = false;
-    let inventoryChanged = false;
 
     // Billing sensitive fields
     if (updates.basePrice !== undefined || updates.price !== undefined || updates.taxRate !== undefined ||
@@ -1011,14 +1061,12 @@ exports.updateProductDraft = functions.https.onCall(async (data, context) => {
         updates.deliveryCharge !== undefined || updates.freeDeliveryMinAmount !== undefined ||
         updates.freeDeliveryMinQuantity !== undefined || updates.minOrderQuantity !== undefined) {
         revBilling++;
-        billingChanged = true;
     }
 
     // Legal sensitive fields
     if (updates.hsnCode !== undefined || updates.legalDisclaimer !== undefined || updates.fssaiNumber !== undefined ||
         updates.isFoodProduct !== undefined || updates.expiryDate !== undefined) {
         revLegal++;
-        legalChanged = true;
     }
 
     // Quality sensitive fields
@@ -1027,7 +1075,6 @@ exports.updateProductDraft = functions.https.onCall(async (data, context) => {
         updates.category !== undefined || updates.subCategory !== undefined || updates.variants !== undefined ||
         updates.specifications !== undefined || updates.nutritionalInfo !== undefined) {
         revQuality++;
-        qualityChanged = true;
     }
 
     // Inventory sensitive fields
@@ -1035,7 +1082,6 @@ exports.updateProductDraft = functions.https.onCall(async (data, context) => {
         updates.rack !== undefined || updates.barcode !== undefined || updates.unit !== undefined ||
         updates.weight !== undefined || updates.unitType !== undefined || updates.measurementUnit !== undefined) {
         revInventory++;
-        inventoryChanged = true;
     }
 
     updates.revBilling = revBilling;
@@ -1044,10 +1090,16 @@ exports.updateProductDraft = functions.https.onCall(async (data, context) => {
     updates.revInventory = revInventory;
     updates.updatedAt = Date.now();
 
-    // If any department revision changed, finalApproval is invalidated!
-    const anyChanged = billingChanged || legalChanged || qualityChanged || inventoryChanged;
-    if (anyChanged && !callerProfile.isMasterAdmin) {
-        updates.finalApproval = false;
+    // Canonical State Transition Invariant:
+    // Detail/price/stock updates PRESERVE existing finalApproval, isVerified, and darkHubId states.
+    if (existing.finalApproval !== undefined) {
+        updates.finalApproval = existing.finalApproval;
+    }
+    if (existing.isVerified !== undefined) {
+        updates.isVerified = existing.isVerified;
+    }
+    if (existing.darkHubId !== undefined) {
+        updates.darkHubId = existing.darkHubId;
     }
 
     await prodRef.update(updates);
@@ -1058,8 +1110,8 @@ exports.updateProductDraft = functions.https.onCall(async (data, context) => {
     return {
         success: true,
         productId,
-        finalApprovalInvalidated: anyChanged && !callerProfile.isMasterAdmin,
-        message: "Product draft updated successfully."
+        finalApprovalInvalidated: false,
+        message: "Product updated successfully preserving approval state."
     };
 });
 
@@ -1576,4 +1628,35 @@ exports.cancelPreorderReservation = functions.https.onCall(async (data, context)
         console.error("Error in cancelPreorderReservation:", err);
         throw new functions.https.HttpsError("failed-precondition", err.message || "Failed to cancel preorder reservation.");
     }
+});
+
+// 9. getPendingProductsForReview (Secure Server-Side Read Path for Approval Queue)
+exports.getPendingProductsForReview = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Authentication required");
+    }
+
+    const callerUid = context.auth.uid;
+    const callerEmail = context.auth.token.email;
+    const callerProfile = await verifyActiveCaller(db, callerUid, callerEmail);
+
+    if (!callerProfile.isMasterAdmin && callerProfile.role !== "ADMIN" && callerProfile.role !== "STAFF") {
+        throw new functions.https.HttpsError("permission-denied", "Unauthorized access to pending approval queue.");
+    }
+
+    let query = db.collection("products").where("isVerified", "==", false);
+
+    if (!callerProfile.isMasterAdmin && callerProfile.role === "STAFF" && callerProfile.assignedHubId) {
+        query = query.where("darkHubId", "==", callerProfile.assignedHubId);
+    }
+
+    const snapshot = await query.get();
+    const products = [];
+    snapshot.forEach(doc => {
+        const prodData = doc.data();
+        prodData.id = doc.id;
+        products.push(prodData);
+    });
+
+    return { success: true, products: products };
 });

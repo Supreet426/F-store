@@ -36,7 +36,7 @@ class NotificationRepository @Inject constructor(
 
         val collection = when (role) {
             "customer" -> "users"
-            "seller" -> "sellers"
+            "seller" -> "merchants"
             "delivery" -> "riders"
             else -> "users"
         }

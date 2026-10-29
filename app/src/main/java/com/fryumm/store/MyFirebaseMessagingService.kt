@@ -77,7 +77,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     if (doc.exists()) {
                         val order = doc.toObject(Order::class.java)
                         if (order != null) {
-                            val collections = listOf("sellers", "users", "staff")
+                            val collections = listOf("merchants", "users", "staff")
                             for (coll in collections) {
                                 firestore.collection(coll).document(currentUser.uid).get()
                                     .addOnSuccessListener { userDoc ->

@@ -403,7 +403,9 @@ fun ProductCard(
     viewModel: StoreViewModel, 
     onEditClick: () -> Unit,
     serialNumber: Int? = null,
-    onReorder: ((Int) -> Unit)? = null
+    onReorder: ((Int) -> Unit)? = null,
+    onSchedulePreorder: (() -> Unit)? = null,
+    onScheduleSale: (() -> Unit)? = null
 ) {
     val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
     val addedDate = sdf.format(Date(product.addedAt))
@@ -412,6 +414,7 @@ fun ProductCard(
     var showVerifyDialog by remember { mutableStateOf(false) }
     var showSequenceDialog by remember { mutableStateOf(false) }
     var showScheduleDialog by remember { mutableStateOf(false) }
+    var showStatusMenu by remember { mutableStateOf(false) }
     
     // Find merchant name
     val merchant = if (isAdmin) viewModel.allUsers.find { it.uid == product.merchantId } else null
@@ -478,7 +481,7 @@ fun ProductCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Admin controls for sequence and merchant info
+            // Admin controls for sequence, category change, and status change in the top line
             if (isAdmin) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     if (merchant != null) {
@@ -488,22 +491,217 @@ fun ProductCard(
                             Text("Merchant: ", fontSize = 11.sp, color = Color.Gray)
                             Text(merchant.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = FStorePurple)
                         }
+                    } else {
+                        Spacer(Modifier.width(1.dp))
                     }
-                    // Sequence Badge (Clickable for Admin)
-                    Surface(
-                        color = FStorePurple.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.clickable { showSequenceDialog = true }
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)) {
-                            Icon(Icons.Default.Sort, null, tint = FStorePurple, modifier = Modifier.size(12.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = if (serialNumber != null) "SERIAL: $serialNumber" else "ORDER: ${product.sequenceNumber}", 
-                                color = FStorePurple, 
-                                fontSize = 10.sp, 
-                                fontWeight = FontWeight.Bold
-                            )
+
+                    // Top line buttons: Order badge -> Category change button -> Live status change button
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // 1. Order Badge (stays where order was)
+                        Surface(
+                            color = FStorePurple.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.clickable { showSequenceDialog = true }
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                Icon(Icons.Default.Sort, null, tint = FStorePurple, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = if (serialNumber != null) "SERIAL: $serialNumber" else "ORDER: ${product.sequenceNumber}", 
+                                    color = FStorePurple, 
+                                    fontSize = 10.sp, 
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // 2. Category change dropdown button (uske bagal me)
+                        var showCategoryMenu by remember { mutableStateOf(false) }
+                        Box {
+                            Surface(
+                                color = Color(0xFFF3E5F5),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.clickable { showCategoryMenu = true }
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                    Text(
+                                        text = "📁 ${product.category.ifBlank { "Category" }}",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = FStorePurple
+                                    )
+                                    Spacer(Modifier.width(2.dp))
+                                    Icon(
+                                        Icons.Default.ArrowDropDown,
+                                        contentDescription = "Change Category",
+                                        modifier = Modifier.size(12.dp),
+                                        tint = FStorePurple
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = showCategoryMenu,
+                                onDismissRequest = { showCategoryMenu = false }
+                            ) {
+                                val categories = viewModel.dynamicAppConfig.categorySequence.ifEmpty { listOf("Fruits & Vegetables", "Dairy & Breakfast", "Munchies", "Cold Drinks & Juices", "Instant & Frozen Food", "Bakery & Biscuits", "Sweet Tooth", "Tea, Coffee & Health Drink", "Atta, Rice & Dal", "Masala, Oil & More", "Sauces & Spreads", "Chicken, Meat & Fish", "Organic & Healthy Living", "Baby Care", "Cleaning Essentials", "Home & Office", "Personal Care", "Pet Care") }
+                                categories.forEach { cat ->
+                                    DropdownMenuItem(
+                                        text = { Text(cat) },
+                                        onClick = {
+                                            showCategoryMenu = false
+                                            viewModel.updateProduct(product.copy(category = cat))
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // 3. Live status change dropdown button (uske bagal me)
+                        var showStatusMenu by remember { mutableStateOf(false) }
+                        Box {
+                            Surface(
+                                color = when {
+                                    !product.isAvailable -> Color(0xFFEEEEEE)
+                                    product.flashSale -> Color(0xFFFFF3E0)
+                                    product.isPreorderEnabled -> FStorePurple.copy(alpha = 0.12f)
+                                    product.isComingSoon -> Color(0xFFFFF8E1)
+                                    product.isInStock -> Color(0xFFE8F5E9)
+                                    else -> Color(0xFFFFEBEE)
+                                },
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.clickable { showStatusMenu = true }
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                    Text(
+                                        text = when {
+                                            !product.isAvailable -> "🔒 Staged"
+                                            product.flashSale -> "⚡ Flash Sale"
+                                            product.isPreorderEnabled -> "⏱️ Preorder"
+                                            product.isComingSoon -> "⏳ Coming Soon"
+                                            product.isInStock -> "🚀 Published"
+                                            else -> "📦 Out of Stock"
+                                        },
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when {
+                                            !product.isAvailable -> Color.DarkGray
+                                            product.flashSale -> Color(0xFFE65100)
+                                            product.isPreorderEnabled -> FStorePurple
+                                            product.isComingSoon -> Color(0xFFF57F17)
+                                            product.isInStock -> Color(0xFF1B5E20)
+                                            else -> Color.Red
+                                        }
+                                    )
+                                    Spacer(Modifier.width(2.dp))
+                                    Icon(
+                                        Icons.Default.ArrowDropDown,
+                                        contentDescription = "Change Status",
+                                        modifier = Modifier.size(12.dp),
+                                        tint = Color.DarkGray
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = showStatusMenu,
+                                onDismissRequest = { showStatusMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("🚀 Published") },
+                                    onClick = {
+                                        showStatusMenu = false
+                                        viewModel.updateProductsStatus(
+                                            listOf(product.id),
+                                            mapOf(
+                                                "isAvailable" to true,
+                                                "isInStock" to true,
+                                                "isComingSoon" to false,
+                                                "isPreorderEnabled" to false,
+                                                "flashSale" to false
+                                            )
+                                        )
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("⏳ Coming Soon") },
+                                    onClick = {
+                                        showStatusMenu = false
+                                        viewModel.updateProductsStatus(
+                                            listOf(product.id),
+                                            mapOf(
+                                                "isAvailable" to true,
+                                                "isComingSoon" to true,
+                                                "isPreorderEnabled" to false,
+                                                "flashSale" to false
+                                            )
+                                        )
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("⏱️ Book Now") },
+                                    onClick = {
+                                        showStatusMenu = false
+                                        if (onSchedulePreorder != null) onSchedulePreorder()
+                                        else {
+                                            viewModel.updateProductsStatus(
+                                                listOf(product.id),
+                                                mapOf(
+                                                    "isAvailable" to true,
+                                                    "isPreorderEnabled" to true,
+                                                    "isComingSoon" to false,
+                                                    "flashSale" to false
+                                                )
+                                            )
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("⚡ Create New Deal") },
+                                    onClick = {
+                                        showStatusMenu = false
+                                        if (onScheduleSale != null) onScheduleSale()
+                                        else {
+                                            viewModel.updateProductsStatus(
+                                                listOf(product.id),
+                                                mapOf(
+                                                    "isAvailable" to true,
+                                                    "flashSale" to true,
+                                                    "isComingSoon" to false,
+                                                    "isPreorderEnabled" to false
+                                                )
+                                            )
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("📦 Out of Stock") },
+                                    onClick = {
+                                        showStatusMenu = false
+                                        viewModel.updateProductsStatus(
+                                            listOf(product.id),
+                                            mapOf(
+                                                "isAvailable" to true,
+                                                "isInStock" to false,
+                                                "isComingSoon" to false,
+                                                "isPreorderEnabled" to false,
+                                                "flashSale" to false
+                                            )
+                                        )
+                                    }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("🔒 Stage in Vault (Hide from App)", color = Color.Red) },
+                                    onClick = {
+                                        showStatusMenu = false
+                                        viewModel.updateProductsStatus(
+                                            listOf(product.id),
+                                            mapOf("isAvailable" to false)
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -566,27 +764,22 @@ fun ProductCard(
                     }
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Switch(
-                        checked = product.isAvailable,
-                        onCheckedChange = { 
-                            viewModel.updateProduct(product.copy(isAvailable = it))
-                        }, 
-                        modifier = Modifier.scale(0.8f)
-                    )
-                    Text(
-                        if (product.isComingSoon) "COMING SOON"
-                        else if (!product.isVerified) "UNVERIFIED"
-                        else if (product.isAvailable) "LIVE" 
-                        else "HIDDEN", 
-                        fontSize = 10.sp, 
-                        fontWeight = FontWeight.Black, 
-                        color = when {
-                            product.isComingSoon -> Color(0xFFFF9800)
-                            !product.isVerified -> Color.Gray
-                            product.isAvailable -> Color(0xFF2E7D32)
-                            else -> Color.Red
-                        }
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (product.isAvailable) "LIVE" else "STAGED",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (product.isAvailable) Color(0xFF2E7D32) else Color.Gray
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Switch(
+                            checked = product.isAvailable,
+                            onCheckedChange = { isLive -> 
+                                viewModel.updateProductsStatus(listOf(product.id), mapOf("isAvailable" to isLive))
+                            }, 
+                            modifier = Modifier.scale(0.8f)
+                        )
+                    }
                 }
             }
             
@@ -609,11 +802,6 @@ fun ProductCard(
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("BARCODE: ${product.barcode}", fontSize = 10.sp, fontWeight = FontWeight.Black, color = FStorePurple)
-                    if (product.hsnCode.isNotBlank()) {
-                        Text("HSN: ${product.hsnCode}", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color(0xFF1B5E20))
-                    }
-                    Text("LOCATION: ${product.aisle}-${product.rack}", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color(0xFF5D4037))
                     Text("Added: $addedDate", fontSize = 10.sp, color = Color.Gray)
                     if (product.expiryDate != null) {
                         Text("EXPIRY: ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(product.expiryDate))}", 

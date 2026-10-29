@@ -206,7 +206,7 @@ fun AdminDashboard(viewModel: StoreViewModel, navController: NavHostController) 
         item {
             AdminQuickAction(
                 "Merchant Directory",
-                "Manage connected sellers",
+                "Manage connected merchants",
                 Icons.Default.Storefront,
                 onClick = { navController.navigate("stores") }
             )

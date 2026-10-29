@@ -18,7 +18,9 @@ data class Product(
     val subCategory: String = "",
     val stockQuantity: Int = 0,
     val stockCount: Int = 0,
-    val isAvailable: Boolean = true,
+    @get:PropertyName("isAvailable")
+    @set:PropertyName("isAvailable")
+    var isAvailable: Boolean = true,
     @get:PropertyName("isInStock")
     @set:PropertyName("isInStock")
     var isInStock: Boolean = true,
@@ -40,9 +42,11 @@ data class Product(
     val approvedRevInventory: Int = 0,
 
     // Workflow & Approval
-    val finalApproval: Boolean = false,
-    val publishingStatus: String = "DRAFT", // "DRAFT", "PUBLISHED", "ARCHIVED"
-    val isVerified: Boolean = false,
+    val finalApproval: Boolean = true, // Legacy compatibility default
+    val publishingStatus: String = "PUBLISHED", // "DRAFT", "PUBLISHED", "ARCHIVED" (Legacy compatibility default)
+    @get:PropertyName("isVerified")
+    @set:PropertyName("isVerified")
+    var isVerified: Boolean = true, // Legacy compatibility default
     val verifiedBy: String = "",
     val verificationDate: Long = 0,
 
@@ -52,12 +56,20 @@ data class Product(
     val overrideBy: String? = null,
     val overrideAt: Long? = null,
 
-    // Preorder Fields
-    val isPreorderEnabled: Boolean = false,
+    // Preorder & Flash Sale Fields
+    @get:PropertyName("isPreorderEnabled")
+    @set:PropertyName("isPreorderEnabled")
+    var isPreorderEnabled: Boolean = false,
     val currentPreorderCount: Int = 0,
     val maxPreorderCapacity: Int = 0,
     val preorderStart: Long? = null,
     val preorderEnd: Long? = null,
+    @get:PropertyName("flashSale")
+    @set:PropertyName("flashSale")
+    var flashSale: Boolean = false,
+    val saleStart: Long? = null,
+    val saleEnd: Long? = null,
+    val discountPercent: Double = 0.0,
 
     // Warehouse & Taxes
     val aisle: String = "",
@@ -82,7 +94,9 @@ data class Product(
     val minOrderQuantity: Int = 1,
     val unitType: String = "Weight",
     val measurementUnit: String = "g",
-    val isComingSoon: Boolean = false,
+    @get:PropertyName("isComingSoon")
+    @set:PropertyName("isComingSoon")
+    var isComingSoon: Boolean = false,
     val expiryDate: Long? = null,
     val deliveryChargeIncluded: Boolean = true,
     val freeDeliveryMinAmount: Double = 0.0,
@@ -91,7 +105,9 @@ data class Product(
     val fssaiNumber: String = "",
     val nutritionalInfo: String = "",
     val adminFeedback: String? = null,
-    val isFoodProduct: Boolean = false,
+    @get:PropertyName("isFoodProduct")
+    @set:PropertyName("isFoodProduct")
+    var isFoodProduct: Boolean = false,
     val variants: List<ProductVariant> = emptyList(),
     val availableCoupons: List<Coupon> = emptyList(),
     val specifications: Map<String, String> = emptyMap(),

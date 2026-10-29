@@ -109,9 +109,38 @@ class StoreViewModel @Inject constructor(
     var simulatedWeatherImpact by mutableStateOf(0.0)
     var simulatedEventImpact by mutableStateOf(0.0)
 
+    var pendingReviewProducts by mutableStateOf<List<Product>>(emptyList())
+    var pendingProductsLoading by mutableStateOf(false)
+    var pendingProductsError by mutableStateOf<String?>(null)
+
     init {
         setupSession()
         startDataObservers()
+        loadPendingProductsForReview()
+    }
+
+    fun loadPendingProductsForReview() {
+        viewModelScope.launch {
+            pendingProductsLoading = true
+            pendingProductsError = null
+            val res = productRepository.getPendingProductsForReview()
+            pendingProductsLoading = false
+            res.fold(
+                onSuccess = { list ->
+                    android.util.Log.d("StoreViewModel", "Loaded ${list.size} pending review products successfully")
+                    pendingReviewProducts = list
+                },
+                onFailure = { err ->
+                    val errorMsg = if (err is com.google.firebase.functions.FirebaseFunctionsException) {
+                        "Cloud Function Error [${err.code}]: ${err.message ?: "Unknown error"}"
+                    } else {
+                        err.localizedMessage ?: "Failed to load approval queue."
+                    }
+                    android.util.Log.e("StoreViewModel", "Failed to load approval queue: $errorMsg", err)
+                    pendingProductsError = errorMsg
+                }
+            )
+        }
     }
 
     fun setupSession() {
@@ -123,7 +152,7 @@ class StoreViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val collections = listOf("users", "sellers", "riders", "staff", "customers")
+                val collections = listOf("users", "merchants", "riders", "staff", "customers")
                 var doc: com.google.firebase.firestore.DocumentSnapshot? = null
                 for (coll in collections) {
                     try {
@@ -163,7 +192,7 @@ class StoreViewModel @Inject constructor(
                         role = if (currentUser.email?.lowercase() in masterAdmins) "ADMIN" else "STORE_OWNER"
                     )
                     try {
-                        val targetCollection = if (newProfile.role == "ADMIN") "users" else "sellers"
+                        val targetCollection = if (newProfile.role == "ADMIN") "users" else "merchants"
                         firestore.collection(targetCollection).document(currentUser.uid).set(newProfile).await()
                     } catch (e: Exception) {
                         Log.e("StoreViewModel", "Error saving new profile", e)
@@ -329,9 +358,19 @@ class StoreViewModel @Inject constructor(
 
     private fun observeCustomers() {
         viewModelScope.launch {
-            firestore.collection("customers").addSnapshotListener { snapshot, _ ->
+            firestore.collection("customers").addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
                 snapshot?.let { 
-                    allCustomers = it.toObjects(CustomerProfile::class.java) 
+                    allCustomers = it.documents.mapNotNull { doc ->
+                        try {
+                            val cust = doc.toObject(CustomerProfile::class.java)?.copy(id = doc.id)
+                            cust?.let { c ->
+                                val fixedPhone = c.mobile.ifBlank { doc.getString("phoneNumber") ?: doc.getString("phone") ?: "" }
+                                val fixedName = c.name.ifBlank { doc.getString("displayName") ?: doc.getString("fullName") ?: doc.getString("customerName") ?: "" }
+                                c.copy(mobile = fixedPhone, name = fixedName)
+                            }
+                        } catch (e: Exception) { null }
+                    }
                     generateUserSegmentationReport()
                 }
             }
@@ -350,14 +389,33 @@ class StoreViewModel @Inject constructor(
     }
 
     private fun observeAllUsers() {
-        val collections = listOf("users", "sellers", "riders", "customers", "staff")
+        val collections = listOf("users", "merchants", "riders", "staff")
         val snapshotListeners = mutableMapOf<String, List<UserProfile>>()
 
         collections.forEach { collectionName ->
             firestore.collection(collectionName).addSnapshotListener { snapshot, error ->
                 if (error != null) return@addSnapshotListener
                 val users = snapshot?.documents?.mapNotNull { doc ->
-                    try { doc.toObject(UserProfile::class.java)?.copy(uid = doc.id) } catch (e: Exception) { null }
+                    try {
+                        val profile = doc.toObject(UserProfile::class.java)?.copy(uid = doc.id)
+                        profile?.let { p ->
+                            val fixedRole = when {
+                                p.role.isNotBlank() && p.role != "STORE_OWNER" -> p.role
+                                collectionName == "merchants" -> "STORE_OWNER"
+                                collectionName == "riders" -> "RIDER"
+                                collectionName == "staff" -> "OTHER"
+                                collectionName == "users" -> "ADMIN"
+                                else -> p.role
+                            }
+                            val fixedPhone = p.phoneNumber.ifBlank { 
+                                doc.getString("mobile") ?: doc.getString("phone") ?: doc.getString("phoneNumber") ?: "" 
+                            }
+                            val fixedName = p.name.ifBlank {
+                                doc.getString("displayName") ?: doc.getString("fullName") ?: doc.getString("name") ?: ""
+                            }
+                            p.copy(role = fixedRole, phoneNumber = fixedPhone, name = fixedName)
+                        }
+                    } catch (e: Exception) { null }
                 } ?: emptyList()
 
                 snapshotListeners[collectionName] = users
@@ -397,9 +455,9 @@ class StoreViewModel @Inject constructor(
     }
 
     private fun filterProducts() {
-        val profile = currentUserProfile ?: return
-        val isAdmin = profile.userRole == UserRole.ADMIN || profile.email.lowercase().trim() in masterAdmins
-        products = if (isAdmin) {
+        val profile = currentUserProfile
+        val isAdmin = profile == null || profile.userRole == UserRole.ADMIN || profile.email.lowercase().trim() in masterAdmins
+        products = if (isAdmin || profile == null) {
             rawProducts
         } else {
             rawProducts.filter { it.merchantId == profile.uid }
@@ -534,7 +592,7 @@ class StoreViewModel @Inject constructor(
                         "RIDER" -> "riders"
                         "OTHER" -> "staff"
                         "CUSTOMER" -> "customers"
-                        else -> "sellers"
+                        else -> "merchants"
                     }
                     val newProfile = UserProfile(
                         uid = user.uid,
@@ -839,13 +897,26 @@ class StoreViewModel @Inject constructor(
     }
 
     fun updateProduct(product: Product) {
-        viewModelScope.launch { productRepository.updateProduct(product) }
+        rawProducts = rawProducts.map { if (it.id == product.id) product else it }
+        filterProducts()
+
+        viewModelScope.launch {
+            try {
+                productRepository.updateProduct(product)
+                _uiEvent.emit(UiEvent.ShowSuccess("Product Updated"))
+            } catch (e: Exception) {
+                _uiEvent.emit(UiEvent.ShowError("Update failed: ${e.message}"))
+            }
+        }
     }
 
     fun updateProductByAdmin(product: Product, feedback: String? = null) {
+        val updatedProduct = product.copy(adminFeedback = feedback ?: product.adminFeedback)
+        rawProducts = rawProducts.map { if (it.id == updatedProduct.id) updatedProduct else it }
+        filterProducts()
+
         viewModelScope.launch {
             try {
-                val updatedProduct = product.copy(adminFeedback = feedback ?: product.adminFeedback)
                 productRepository.updateProduct(updatedProduct)
                 _uiEvent.emit(UiEvent.ShowSuccess("Product Updated by Admin"))
             } catch (e: Exception) {
@@ -905,9 +976,12 @@ class StoreViewModel @Inject constructor(
     }
 
     fun updateProductSequence(productId: String, newSequence: Int) {
+        rawProducts = rawProducts.map { if (it.id == productId) it.copy(sequenceNumber = newSequence) else it }
+        filterProducts()
+
         viewModelScope.launch {
             try {
-                firestore.collection("products").document(productId).update("sequenceNumber", newSequence).await()
+                productRepository.updateProduct(productId, mapOf("sequenceNumber" to newSequence))
                 _uiEvent.emit(UiEvent.ShowSuccess("Sequence updated"))
             } catch (e: Exception) {
                 _uiEvent.emit(UiEvent.ShowError("Failed to update sequence"))
@@ -915,15 +989,60 @@ class StoreViewModel @Inject constructor(
         }
     }
 
+    fun updateProductsStatus(productIds: List<String>, updateMap: Map<String, Any>) {
+        // 1. Optimistic Instant UI Update in Memory
+        val isAvail = updateMap["isAvailable"] as? Boolean
+        val isInStk = updateMap["isInStock"] as? Boolean
+        val isComing = updateMap["isComingSoon"] as? Boolean
+        val isPre = updateMap["isPreorderEnabled"] as? Boolean
+        val flash = updateMap["flashSale"] as? Boolean
+        val preStart = updateMap["preorderStart"] as? Long
+        val preEnd = updateMap["preorderEnd"] as? Long
+        val preCap = updateMap["maxPreorderCapacity"] as? Int
+        val saleSt = updateMap["saleStart"] as? Long
+        val saleEd = updateMap["saleEnd"] as? Long
+        val discPct = updateMap["discountPercent"] as? Double
+
+        rawProducts = rawProducts.map { product ->
+            if (product.id in productIds) {
+                product.copy(
+                    isAvailable = isAvail ?: product.isAvailable,
+                    isInStock = isInStk ?: product.isInStock,
+                    isComingSoon = isComing ?: product.isComingSoon,
+                    isPreorderEnabled = isPre ?: product.isPreorderEnabled,
+                    flashSale = flash ?: product.flashSale,
+                    preorderStart = preStart ?: product.preorderStart,
+                    preorderEnd = preEnd ?: product.preorderEnd,
+                    maxPreorderCapacity = preCap ?: product.maxPreorderCapacity,
+                    saleStart = saleSt ?: product.saleStart,
+                    saleEnd = saleEd ?: product.saleEnd,
+                    discountPercent = discPct ?: product.discountPercent
+                )
+            } else {
+                product
+            }
+        }
+        filterProducts()
+
+        // 2. Persist via Cloud Function Callables
+        viewModelScope.launch {
+            try {
+                productIds.forEach { id ->
+                    productRepository.updateProduct(id, updateMap)
+                }
+                _uiEvent.emit(UiEvent.ShowSuccess("Updated ${productIds.size} product(s)"))
+            } catch (e: Exception) {
+                _uiEvent.emit(UiEvent.ShowError("Update failed: ${e.message}"))
+            }
+        }
+    }
+
     fun bulkUpdateProductSequences(updatedProducts: List<Product>) {
         viewModelScope.launch {
             try {
-                val batch = firestore.batch()
                 updatedProducts.forEach { product ->
-                    val docRef = firestore.collection("products").document(product.id)
-                    batch.update(docRef, "sequenceNumber", product.sequenceNumber)
+                    productRepository.updateProduct(product.id, mapOf("sequenceNumber" to product.sequenceNumber))
                 }
-                batch.commit().await()
                 _uiEvent.emit(UiEvent.ShowSuccess("Sequences saved"))
             } catch (e: Exception) {
                 _uiEvent.emit(UiEvent.ShowError("Failed to update sequences"))
@@ -934,20 +1053,7 @@ class StoreViewModel @Inject constructor(
     fun approveProduct(productId: String, commission: Double, profitPercent: Double, deliveryCharge: Double, gstRate: Double) {
         viewModelScope.launch {
             try {
-                firestore.collection("products").document(productId).update(
-                    mapOf(
-                        "isVerified" to true,
-                        "isAvailable" to true,
-                        "verifiedBy" to (auth.currentUser?.uid ?: "admin"),
-                        "verificationDate" to System.currentTimeMillis(),
-                        "commissionRate" to commission,
-                        "adminProfitPercent" to profitPercent,
-                        "deliveryCharge" to deliveryCharge,
-                        "taxRate" to gstRate,
-                        "cgstRate" to gstRate / 2.0,
-                        "sgstRate" to gstRate / 2.0
-                    )
-                ).await()
+                productRepository.grantFinalApproval(productId, commission, gstRate)
                 _uiEvent.emit(UiEvent.ShowSuccess("Product Approved"))
             } catch (e: Exception) {
                 _uiEvent.emit(UiEvent.ShowError("Approval Failed"))
@@ -960,12 +1066,9 @@ class StoreViewModel @Inject constructor(
             try {
                 val validProducts = rawProducts.filter { it.id.isNotBlank() }
                 if (validProducts.isEmpty()) return@launch
-                val batch = firestore.batch()
                 validProducts.forEach { product ->
-                    val docRef = firestore.collection("products").document(product.id)
-                    batch.set(docRef, mapOf("isVerified" to true, "isAvailable" to true), com.google.firebase.firestore.SetOptions.merge())
+                    productRepository.grantAdminOverride(product.id, "Bulk Admin Approval")
                 }
-                batch.commit().await()
                 _uiEvent.emit(UiEvent.ShowSuccess("Approved all products"))
             } catch (e: Exception) {
                 _uiEvent.emit(UiEvent.ShowError("Bulk Approval Failed"))
@@ -1068,7 +1171,7 @@ class StoreViewModel @Inject constructor(
                 // Safe unassign attached merchants and riders
                 allUsers.filter { it.darkStoreId == id }.forEach { user ->
                     val col = when (user.userRole) {
-                        UserRole.MERCHANT, UserRole.STORE_OWNER -> "sellers"
+                        UserRole.MERCHANT, UserRole.STORE_OWNER -> "merchants"
                         UserRole.RIDER -> "riders"
                         else -> "users"
                     }
@@ -1091,7 +1194,7 @@ class StoreViewModel @Inject constructor(
     fun assignMerchantToDarkStore(merchantId: String, darkStoreId: String?) {
         viewModelScope.launch {
             try {
-                firestore.collection("sellers").document(merchantId).update("darkStoreId", darkStoreId).await()
+                firestore.collection("merchants").document(merchantId).update("darkStoreId", darkStoreId).await()
 
                 // Sync assignedMerchantIds across dark stores
                 darkStores.forEach { ds ->
@@ -1231,7 +1334,7 @@ class StoreViewModel @Inject constructor(
                     UserRole.RIDER -> "riders"
                     UserRole.OTHER -> "staff"
                     UserRole.CUSTOMER -> "customers"
-                    else -> "sellers"
+                    else -> "merchants"
                 }
                 
                 val updates = mutableMapOf<String, Any>(
@@ -1265,7 +1368,7 @@ class StoreViewModel @Inject constructor(
                         UserRole.RIDER -> "riders"
                         UserRole.OTHER -> "staff"
                         UserRole.CUSTOMER -> "customers"
-                        else -> "sellers"
+                        else -> "merchants"
                     }
                     val parsedRole = try { UserRole.valueOf(newRole.uppercase()) } catch(e: Exception) { UserRole.STORE_OWNER }
                     val newCollection = when(parsedRole) {
@@ -1273,7 +1376,7 @@ class StoreViewModel @Inject constructor(
                         UserRole.RIDER -> "riders"
                         UserRole.OTHER -> "staff"
                         UserRole.CUSTOMER -> "customers"
-                        else -> "sellers"
+                        else -> "merchants"
                     }
 
                     val updates = mapOf(
@@ -1302,7 +1405,7 @@ class StoreViewModel @Inject constructor(
                             UserRole.ADMIN -> "users"
                             UserRole.RIDER -> "riders"
                             UserRole.OTHER -> "staff"
-                            else -> "sellers"
+                            else -> "merchants"
                         }
                         val data = custDoc.data?.toMutableMap() ?: mutableMapOf()
                         data["role"] = newRole
@@ -1839,7 +1942,7 @@ class StoreViewModel @Inject constructor(
                     UserRole.RIDER -> "riders"
                     UserRole.OTHER -> "staff"
                     UserRole.CUSTOMER -> "customers"
-                    else -> "sellers"
+                    else -> "merchants"
                 }
                 firestore.collection(collection).document(uid).delete().await()
                 _uiEvent.emit(UiEvent.ShowSuccess("User Deleted"))
@@ -1998,7 +2101,7 @@ class StoreViewModel @Inject constructor(
     fun approveMerchant(uid: String) {
         viewModelScope.launch {
             try {
-                firestore.collection("sellers").document(uid).update(
+                firestore.collection("merchants").document(uid).update(
                     mapOf(
                         "active" to true,
                         "isActive" to true,
@@ -2021,7 +2124,7 @@ class StoreViewModel @Inject constructor(
                     UserRole.RIDER -> "riders"
                     UserRole.OTHER -> "staff"
                     UserRole.CUSTOMER -> "customers"
-                    else -> "sellers"
+                    else -> "merchants"
                 }
                 firestore.collection(collection).document(uid).update(
                     mapOf(
@@ -2046,7 +2149,7 @@ class StoreViewModel @Inject constructor(
                     UserRole.RIDER -> "riders"
                     UserRole.OTHER -> "staff"
                     UserRole.CUSTOMER -> "customers"
-                    else -> "sellers"
+                    else -> "merchants"
                 }
                 
                 val parsedRole = try { UserRole.valueOf(newRole.uppercase()) } catch(e: Exception) { UserRole.STORE_OWNER }
@@ -2055,7 +2158,7 @@ class StoreViewModel @Inject constructor(
                     UserRole.RIDER -> "riders"
                     UserRole.OTHER -> "staff"
                     UserRole.CUSTOMER -> "customers"
-                    else -> "sellers"
+                    else -> "merchants"
                 }
 
                 val updates = mapOf(
@@ -2095,7 +2198,7 @@ class StoreViewModel @Inject constructor(
                     UserRole.RIDER -> "riders"
                     UserRole.OTHER -> "staff"
                     UserRole.CUSTOMER -> "customers"
-                    else -> "sellers"
+                    else -> "merchants"
                 }
                 firestore.collection(collection).document(uid).update(
                     mapOf(
@@ -2286,7 +2389,7 @@ class StoreViewModel @Inject constructor(
     fun updateUserStatusForReferral(profile: UserProfile) {
         viewModelScope.launch {
             try {
-                firestore.collection("sellers").document(profile.uid).set(profile, com.google.firebase.firestore.SetOptions.merge()).await()
+                firestore.collection("merchants").document(profile.uid).set(profile, com.google.firebase.firestore.SetOptions.merge()).await()
                 _uiEvent.emit(UiEvent.ShowSuccess("Referral target updated"))
             } catch (e: Exception) {
                 _uiEvent.emit(UiEvent.ShowError("Update Failed"))
@@ -2300,7 +2403,7 @@ class StoreViewModel @Inject constructor(
                 val url = storageRepository.uploadImage(uri, "profiles/${UUID.randomUUID()}")
                 if (url != null) {
                     val profile = currentUserProfile?.copy(photoUrl = url) ?: return@launch
-                    val collection = if (profile.userRole == UserRole.ADMIN) "users" else "sellers"
+                    val collection = if (profile.userRole == UserRole.ADMIN) "users" else "merchants"
                     firestore.collection(collection).document(profile.uid).update("photoUrl", url).await()
                     currentUserProfile = profile
                     _uiEvent.emit(UiEvent.ShowSuccess("Profile photo updated"))
@@ -2319,7 +2422,7 @@ class StoreViewModel @Inject constructor(
                     UserRole.RIDER -> "riders"
                     UserRole.OTHER -> "staff"
                     UserRole.CUSTOMER -> "customers"
-                    else -> "sellers"
+                    else -> "merchants"
                 }
                 val updates = mutableMapOf<String, Any?>(
                     "name" to profile.name,
@@ -2382,7 +2485,7 @@ class StoreViewModel @Inject constructor(
                     vacationStart = vacationStart,
                     vacationEnd = vacationEnd
                 )
-                firestore.collection("sellers").document(profile.uid).set(updated, com.google.firebase.firestore.SetOptions.merge()).await()
+                firestore.collection("merchants").document(profile.uid).set(updated, com.google.firebase.firestore.SetOptions.merge()).await()
                 currentUserProfile = updated
                 _uiEvent.emit(UiEvent.ShowSuccess("Availability settings saved"))
             } catch (e: Exception) {

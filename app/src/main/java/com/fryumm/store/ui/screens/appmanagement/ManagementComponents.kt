@@ -212,7 +212,9 @@ fun StrategyCard(
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-                    Text(subtitle, fontSize = 11.sp, color = Color.Gray)
+                    if (subtitle.isNotEmpty()) {
+                        Text(subtitle, fontSize = 11.sp, color = Color.Gray)
+                    }
                 }
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)

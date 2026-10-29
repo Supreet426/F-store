@@ -31,7 +31,7 @@ export function initDarkStoresListener() {
     });
 
     // 2. Listen to Sellers
-    onSnapshot(collection(db, "sellers"), (snapshot) => {
+    onSnapshot(collection(db, "merchants"), (snapshot) => {
         sellersList = snapshot.docs.map(docSnap => ({
             id: docSnap.id,
             ...docSnap.data()
@@ -307,7 +307,7 @@ window.deleteDarkStore = async function(id) {
         const attachedSellers = sellersList.filter(s => s.darkStoreId === id);
         for (const seller of attachedSellers) {
             try {
-                await updateDoc(doc(db, "sellers", seller.id), { darkStoreId: null });
+                await updateDoc(doc(db, "merchants", seller.id), { darkStoreId: null });
             } catch (_) {}
         }
 
@@ -436,9 +436,9 @@ async function handleDarkStoreSubmit(e) {
             const shouldBeAssigned = currentSelectedMerchantIds.has(seller.id);
             const isCurrentlyAssigned = seller.darkStoreId === dsId;
             if (shouldBeAssigned && !isCurrentlyAssigned) {
-                await updateDoc(doc(db, "sellers", seller.id), { darkStoreId: dsId });
+                await updateDoc(doc(db, "merchants", seller.id), { darkStoreId: dsId });
             } else if (!shouldBeAssigned && isCurrentlyAssigned) {
-                await updateDoc(doc(db, "sellers", seller.id), { darkStoreId: null });
+                await updateDoc(doc(db, "merchants", seller.id), { darkStoreId: null });
             }
         }
 

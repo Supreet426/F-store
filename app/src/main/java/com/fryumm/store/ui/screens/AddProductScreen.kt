@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,8 +12,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,6 +25,8 @@ import android.widget.Toast
 import com.fryumm.store.ui.viewmodels.StoreViewModel
 import com.fryumm.store.data.model.Coupon
 import com.fryumm.store.data.model.Product
+import com.fryumm.store.data.model.UserProfile
+import com.fryumm.store.data.model.DarkStore
 import com.fryumm.store.data.model.UserRole
 import com.fryumm.store.ui.components.*
 import com.fryumm.store.ui.screens.addproduct.*
@@ -127,6 +132,21 @@ fun AddProductScreen(
     val isMerchant = viewModel.currentUserProfile?.userRole == UserRole.STORE_OWNER
     val canEditPricing = isAdmin || isMerchant
 
+    val isEditing = productToEdit != null
+    var selectedDarkHubId by remember { mutableStateOf(productToEdit?.darkHubId ?: "") }
+    var selectedOwnershipType by remember {
+        mutableStateOf(
+            when {
+                productToEdit != null && !productToEdit.merchantId.isNullOrBlank() -> "MERCHANT"
+                productToEdit != null && !productToEdit.darkStoreId.isNullOrBlank() -> "DARKSTORE"
+                else -> ""
+            }
+        )
+    }
+
+    var selectedMerchantId by remember { mutableStateOf(productToEdit?.merchantId ?: "") }
+    var selectedDarkStoreId by remember { mutableStateOf(productToEdit?.darkStoreId ?: "") }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -193,6 +213,25 @@ fun AddProductScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp).background(Color.White)) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(24.dp), modifier = Modifier.weight(1f)) {
+                if (isAdmin) {
+                    item {
+                        OwnershipSelectionSection(
+                            isAdmin = isAdmin,
+                            isEditing = isEditing,
+                            selectedDarkHubId = selectedDarkHubId,
+                            onDarkHubSelected = { selectedDarkHubId = it },
+                            selectedOwnershipType = selectedOwnershipType,
+                            onOwnershipTypeChange = { selectedOwnershipType = it },
+                            selectedMerchantId = selectedMerchantId,
+                            onMerchantSelected = { selectedMerchantId = it },
+                            selectedDarkStoreId = selectedDarkStoreId,
+                            onDarkStoreSelected = { selectedDarkStoreId = it },
+                            merchants = viewModel.allUsers.filter { it.role == "MERCHANT" || it.userRole == UserRole.STORE_OWNER },
+                            darkStores = viewModel.darkStores
+                        )
+                    }
+                }
+
                 item {
                     BasicInfoSection(
                         brand = brand,
@@ -342,6 +381,25 @@ fun AddProductScreen(
 
             Button(
                 onClick = {
+                    if (isAdmin && !isEditing) {
+                        if (selectedDarkHubId.isBlank()) {
+                            Toast.makeText(context, "MANDATORY: Dark Hub selection is required for all products.", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+                        if (selectedOwnershipType.isBlank()) {
+                            Toast.makeText(context, "MANDATORY: Please select Product Owner (Merchant OR Dark Store).", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+                        if (selectedOwnershipType == "MERCHANT" && selectedMerchantId.isBlank()) {
+                            Toast.makeText(context, "MANDATORY: Please select a Target Merchant for this product.", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+                        if (selectedOwnershipType == "DARKSTORE" && selectedDarkStoreId.isBlank()) {
+                            Toast.makeText(context, "MANDATORY: Please select a Target Dark Store for this product.", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+                    }
+
                     if (!isFormValid) {
                         val missing = mutableListOf<String>()
                         if (brand.isBlank()) missing.add("Brand")
@@ -363,6 +421,51 @@ fun AddProductScreen(
                         val parsedExpiry = if (isFoodProduct && expiryDate.isNotBlank()) {
                             try { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(expiryDate)?.time } catch (e: Exception) { null }
                         } else null
+
+                        val resolvedMerchantId: String
+                        val resolvedMerchantName: String
+                        val resolvedDarkStoreId: String?
+                        val resolvedDarkHubId: String
+
+                        if (isEditing) {
+                            if (!productToEdit!!.merchantId.isNullOrBlank()) {
+                                resolvedMerchantId = productToEdit.merchantId
+                                resolvedMerchantName = productToEdit.merchantName
+                                resolvedDarkStoreId = null
+                                resolvedDarkHubId = productToEdit.darkHubId
+                            } else {
+                                resolvedMerchantId = ""
+                                resolvedMerchantName = ""
+                                resolvedDarkStoreId = productToEdit.darkStoreId
+                                resolvedDarkHubId = productToEdit.darkHubId
+                            }
+                        } else if (isAdmin) {
+                            resolvedDarkHubId = selectedDarkHubId
+                            if (selectedOwnershipType == "MERCHANT") {
+                                val selectedMerchant = viewModel.allUsers.find { it.uid == selectedMerchantId }
+                                resolvedMerchantId = selectedMerchantId
+                                resolvedMerchantName = selectedMerchant?.name ?: "Merchant"
+                                resolvedDarkStoreId = null // STRICT XOR EXCLUSION
+                            } else {
+                                resolvedMerchantId = "" // STRICT XOR EXCLUSION
+                                resolvedMerchantName = ""
+                                resolvedDarkStoreId = selectedDarkStoreId.ifBlank { selectedDarkHubId }
+                            }
+                        } else {
+                            val isMerchantUser = viewModel.currentUserProfile?.role == "MERCHANT" || viewModel.currentUserProfile?.role == "STORE_OWNER"
+                            if (isMerchantUser) {
+                                resolvedMerchantId = viewModel.currentUserProfile?.uid ?: ""
+                                resolvedMerchantName = viewModel.currentUserProfile?.name ?: "Flash-O Merchant"
+                                resolvedDarkStoreId = null // STRICT XOR EXCLUSION
+                                resolvedDarkHubId = viewModel.currentUserProfile?.darkStoreId ?: ""
+                            } else {
+                                val defaultStore = viewModel.darkStores.firstOrNull()
+                                resolvedMerchantId = ""
+                                resolvedMerchantName = ""
+                                resolvedDarkStoreId = viewModel.currentUserProfile?.darkStoreId?.takeIf { it.isNotBlank() } ?: defaultStore?.id ?: "DS_MAIN"
+                                resolvedDarkHubId = viewModel.currentUserProfile?.darkStoreId?.takeIf { it.isNotBlank() } ?: defaultStore?.id ?: "DS_MAIN"
+                            }
+                        }
 
                         val product = Product(
                             id = productToEdit?.id ?: "",
@@ -409,11 +512,12 @@ fun AddProductScreen(
                             specifications = specifications,
                             isVerified = isAdmin,
                             adminFeedback = adminFeedback,
-                            merchantId = productToEdit?.merchantId ?: viewModel.currentUserProfile?.uid ?: "merchant_1",
-                            merchantName = productToEdit?.merchantName ?: viewModel.currentUserProfile?.name ?: "Flash-O Merchant",
-                            darkStoreId = productToEdit?.darkStoreId,
-                            darkHubId = productToEdit?.darkHubId ?: "",
-                            variants = variants
+                            merchantId = resolvedMerchantId,
+                            merchantName = resolvedMerchantName,
+                            darkStoreId = resolvedDarkStoreId,
+                            darkHubId = resolvedDarkHubId,
+                            variants = variants,
+                            sequenceNumber = productToEdit?.sequenceNumber ?: 999
                         )
 
                         if (productToEdit == null) {
@@ -465,5 +569,221 @@ fun AddProductScreen(
             isAdmin = isAdmin,
             onAddCategory = { viewModel.addCategory(it) }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OwnershipSelectionSection(
+    isAdmin: Boolean,
+    isEditing: Boolean,
+    selectedDarkHubId: String,
+    onDarkHubSelected: (String) -> Unit,
+    selectedOwnershipType: String,
+    onOwnershipTypeChange: (String) -> Unit,
+    selectedMerchantId: String,
+    onMerchantSelected: (String) -> Unit,
+    selectedDarkStoreId: String,
+    onDarkStoreSelected: (String) -> Unit,
+    merchants: List<UserProfile>,
+    darkStores: List<DarkStore>
+) {
+    if (!isAdmin) return
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F3FF)),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "1. Dark Hub Assignment (Compulsory)*",
+                fontWeight = FontWeight.Bold,
+                color = FStorePurple,
+                fontSize = 15.sp
+            )
+
+            if (isEditing) {
+                Text(
+                    text = "Dark Hub ID: ${selectedDarkHubId.ifBlank { "Locked" }}",
+                    style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.DarkGray)
+                )
+            } else {
+                var expandedHubDropdown by remember { mutableStateOf(false) }
+                val selectedHubStore = darkStores.find { it.id == selectedDarkHubId }
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedHubDropdown,
+                    onExpandedChange = { expandedHubDropdown = !expandedHubDropdown }
+                ) {
+                    OutlinedTextField(
+                        value = selectedHubStore?.let { "${it.name} (${it.id})" } ?: selectedDarkHubId,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Select Dark Hub*") },
+                        placeholder = { Text("Click to choose Dark Hub...") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedHubDropdown) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedHubDropdown,
+                        onDismissRequest = { expandedHubDropdown = false }
+                    ) {
+                        if (darkStores.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("No active dark hubs found") },
+                                onClick = { expandedHubDropdown = false }
+                            )
+                        } else {
+                            darkStores.forEach { hub ->
+                                DropdownMenuItem(
+                                    text = { Text("${hub.name} (${hub.id})") },
+                                    onClick = {
+                                        onDarkHubSelected(hub.id)
+                                        expandedHubDropdown = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+
+            Text(
+                text = "2. Exclusive Owner (Merchant XOR Dark Store)*",
+                fontWeight = FontWeight.Bold,
+                color = FStorePurple,
+                fontSize = 15.sp
+            )
+
+            if (isEditing) {
+                Text(
+                    text = "Ownership is locked for existing items to maintain catalog integrity.",
+                    style = TextStyle(fontSize = 12.sp, color = Color.Gray)
+                )
+            } else {
+                Text(
+                    text = "Select EXACTLY ONE owner (Merchant or Dark Store):",
+                    style = TextStyle(fontSize = 13.sp, color = Color.DarkGray)
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onOwnershipTypeChange("MERCHANT") }
+                    ) {
+                        RadioButton(
+                            selected = selectedOwnershipType == "MERCHANT",
+                            onClick = { onOwnershipTypeChange("MERCHANT") }
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Merchant", fontWeight = FontWeight.SemiBold)
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onOwnershipTypeChange("DARKSTORE") }
+                    ) {
+                        RadioButton(
+                            selected = selectedOwnershipType == "DARKSTORE",
+                            onClick = { onOwnershipTypeChange("DARKSTORE") }
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Dark Store", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                if (selectedOwnershipType == "MERCHANT") {
+                    var expandedMerchantDropdown by remember { mutableStateOf(false) }
+                    val selectedMerchant = merchants.find { it.uid == selectedMerchantId }
+
+                    ExposedDropdownMenuBox(
+                        expanded = expandedMerchantDropdown,
+                        onExpandedChange = { expandedMerchantDropdown = !expandedMerchantDropdown }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedMerchant?.let { "${it.name} (${it.email})" } ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Select Target Merchant*") },
+                            placeholder = { Text("Click to choose merchant...") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedMerchantDropdown) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedMerchantDropdown,
+                            onDismissRequest = { expandedMerchantDropdown = false }
+                        ) {
+                            if (merchants.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("No active merchants found") },
+                                    onClick = { expandedMerchantDropdown = false }
+                                )
+                            } else {
+                                merchants.forEach { m ->
+                                    DropdownMenuItem(
+                                        text = { Text("${m.name} (${m.email})") },
+                                        onClick = {
+                                            onMerchantSelected(m.uid)
+                                            expandedMerchantDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (selectedOwnershipType == "DARKSTORE") {
+                    var expandedDarkStoreDropdown by remember { mutableStateOf(false) }
+                    val selectedStore = darkStores.find { it.id == selectedDarkStoreId }
+
+                    ExposedDropdownMenuBox(
+                        expanded = expandedDarkStoreDropdown,
+                        onExpandedChange = { expandedDarkStoreDropdown = !expandedDarkStoreDropdown }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedStore?.let { "${it.name} (${it.id})" } ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Select Target Dark Store*") },
+                            placeholder = { Text("Click to choose dark store...") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDarkStoreDropdown) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedDarkStoreDropdown,
+                            onDismissRequest = { expandedDarkStoreDropdown = false }
+                        ) {
+                            if (darkStores.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("No active dark stores found") },
+                                    onClick = { expandedDarkStoreDropdown = false }
+                                )
+                            } else {
+                                darkStores.forEach { ds ->
+                                    DropdownMenuItem(
+                                        text = { Text("${ds.name} (${ds.id})") },
+                                        onClick = {
+                                            onDarkStoreSelected(ds.id)
+                                            expandedDarkStoreDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -1,13 +1,12 @@
 package com.fryumm.store.ui.screens.appmanagement
 
-import android.net.Uri
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.MediaController
-import android.widget.VideoView
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,304 +15,615 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import coil.compose.AsyncImage
 import com.fryumm.store.data.model.*
 import com.fryumm.store.ui.theme.FStorePurple
+import java.text.SimpleDateFormat
+import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreenLayoutTab(
     config: DynamicAppConfig,
     onConfigChange: (DynamicAppConfig) -> Unit
 ) {
-    var showAddSectionDialog by remember { mutableStateOf<String?>(null) }
-    var sectionUrlToAdd by remember { mutableStateOf("") }
-    var videoPreviewUrl by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    var selectedPlatform by remember { mutableStateOf("app") } // "app", "web", "global"
+    var activeSubTab by remember { mutableStateOf("sections") } // "sections", "banners", "flash_sale", "pass", "popup"
+    
+    var localConfig by remember(config) { mutableStateOf(config) }
+    var hasUnsavedChanges by remember { mutableStateOf(false) }
+    var showPublishDialog by remember { mutableStateOf(false) }
+    var publishTarget by remember { mutableStateOf("app") }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+    // Dialog state for adding banner
+    var showBannerDialog by remember { mutableStateOf(false) }
+    var bannerTitle by remember { mutableStateOf("") }
+    var bannerImageUrl by remember { mutableStateOf("") }
+    var bannerActionUrl by remember { mutableStateOf("") }
+
+    // Dialog state for adding section
+    var showSectionDialog by remember { mutableStateOf(false) }
+    var newSectionName by remember { mutableStateOf("") }
+
+    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()) }
+    val lastUpdatedStr = remember(localConfig.lastUpdated) {
+        if (localConfig.lastUpdated > 0) dateFormat.format(Date(localConfig.lastUpdated)) else "Just now"
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8F9FA)),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            StrategyCard(
-                title = "Home Screen Layout",
-                subtitle = "Manage the sequence and content of sections",
-                icon = Icons.Default.Dashboard,
-                color = Color(0xFFE91E63)
+        // 1. Prominent Main Platform Tabs (Customer App, Customer Website, Global Settings) stuck right to top title bar
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.White,
+            shadowElevation = 4.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .background(Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("QUICK ADD SECTIONS", fontSize = 10.sp, fontWeight = FontWeight.Black, color = FStorePurple)
-                    
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(
-                            onClick = { showAddSectionDialog = "BANNER_AD"; sectionUrlToAdd = "" },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.textButtonColors(containerColor = Color.Gray.copy(0.05f))
+                listOf(
+                    "app" to "Customer App", 
+                    "web" to "Customer Website", 
+                    "global" to "Global Settings"
+                ).forEach { (key, label) ->
+                    val isSelected = selectedPlatform == key
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { selectedPlatform = key },
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isSelected) FStorePurple else Color.Transparent,
+                        shadowElevation = if (isSelected) 2.dp else 0.dp
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(vertical = 10.dp), 
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.AddPhotoAlternate, null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("BANNER", fontSize = 10.sp)
-                        }
-                        
-                        TextButton(
-                            onClick = { showAddSectionDialog = "VIDEO_AD"; sectionUrlToAdd = "" },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.textButtonColors(containerColor = Color.Gray.copy(0.05f))
-                        ) {
-                            Icon(Icons.Default.VideoCall, null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("VIDEO AD", fontSize = 10.sp)
-                        }
-
-                        TextButton(
-                            onClick = { showAddSectionDialog = "PRODUCT_AD"; sectionUrlToAdd = "" },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.textButtonColors(containerColor = Color.Gray.copy(0.05f))
-                        ) {
-                            Icon(Icons.Default.Star, null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("PROMO AD", fontSize = 10.sp)
+                            Text(
+                                label,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                color = if (isSelected) Color.White else Color(0xFF1E293B)
+                            )
                         }
                     }
+                }
+            }
+        }
 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { 
-                                val current = config.homeSectionOrder.toMutableList()
-                                current.add("FLASH_D_PASS_99")
-                                onConfigChange(config.copy(homeSectionOrder = current))
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3E007C))
-                        ) {
-                            Icon(Icons.Default.CardMembership, null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("ADD PASS 99", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        // 2. Sub-Navigation Tabs & Content Area
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Sub-Navigation Tabs
+            ScrollableTabRow(
+                selectedTabIndex = when(activeSubTab) {
+                    "sections" -> 0
+                    "banners" -> 1
+                    "flash_sale" -> 2
+                    "pass" -> 3
+                    "popup" -> 4
+                    else -> 0
+                },
+                containerColor = Color.Transparent,
+                edgePadding = 0.dp,
+                divider = {}
+            ) {
+                listOf(
+                    "sections" to "Visual Section Builder",
+                    "banners" to "Banners & Campaigns",
+                    "flash_sale" to "Flash Sale Engine",
+                    "pass" to "Flash-O Pass Tiers",
+                    "popup" to "Popup Alert"
+                ).forEach { (key, label) ->
+                    Tab(
+                        selected = activeSubTab == key,
+                        onClick = { activeSubTab = key },
+                        text = {
+                            Text(
+                                label,
+                                fontWeight = if (activeSubTab == key) FontWeight.Bold else FontWeight.Normal,
+                                color = if (activeSubTab == key) FStorePurple else Color.Gray,
+                                fontSize = 13.sp
+                            )
                         }
+                    )
+                }
+            }
 
-                        Button(
-                            onClick = { 
-                                val current = config.homeSectionOrder.toMutableList()
-                                current.add("FLASH_D_PASS_199")
-                                onConfigChange(config.copy(homeSectionOrder = current))
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3F6C))
-                        ) {
-                            Icon(Icons.Default.WorkspacePremium, null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("ADD PREMIUM 199", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            // Content Area based on Sub-Tab
+            Box(modifier = Modifier.weight(1f)) {
+                when (activeSubTab) {
+                    "sections" -> SectionsBuilderView(
+                        config = localConfig,
+                        onAddSection = { showSectionDialog = true },
+                        onReorder = { newOrder ->
+                            localConfig = localConfig.copy(homeSectionOrder = newOrder, lastUpdated = System.currentTimeMillis())
+                            hasUnsavedChanges = true
+                            onConfigChange(localConfig)
+                        },
+                        onDeleteSection = { sectionName ->
+                            val updated = localConfig.homeSectionOrder.filter { it != sectionName }
+                            localConfig = localConfig.copy(homeSectionOrder = updated, lastUpdated = System.currentTimeMillis())
+                            hasUnsavedChanges = true
+                            onConfigChange(localConfig)
                         }
+                    )
+                    "banners" -> BannersManagerView(
+                        banners = localConfig.bannerAds,
+                        onAddClick = { showBannerDialog = true },
+                        onToggle = { id ->
+                            val updated = localConfig.bannerAds.map { if (it.id == id) it.copy(isActive = !it.isActive) else it }
+                            localConfig = localConfig.copy(bannerAds = updated, lastUpdated = System.currentTimeMillis())
+                            hasUnsavedChanges = true
+                            onConfigChange(localConfig)
+                        },
+                        onDelete = { id ->
+                            val updated = localConfig.bannerAds.filter { it.id != id }
+                            localConfig = localConfig.copy(bannerAds = updated, lastUpdated = System.currentTimeMillis())
+                            hasUnsavedChanges = true
+                            onConfigChange(localConfig)
+                        }
+                    )
+                    "flash_sale" -> FlashSaleManagerView(
+                        flashSale = localConfig.flashSale,
+                        onUpdate = { fs ->
+                            localConfig = localConfig.copy(flashSale = fs, lastUpdated = System.currentTimeMillis())
+                            hasUnsavedChanges = true
+                            onConfigChange(localConfig)
+                        }
+                    )
+                    "pass" -> FlashOPassManagerView(
+                        passConfig = localConfig.flashOPass,
+                        onUpdate = { pass ->
+                            localConfig = localConfig.copy(flashOPass = pass, lastUpdated = System.currentTimeMillis())
+                            hasUnsavedChanges = true
+                            onConfigChange(localConfig)
+                        }
+                    )
+                    "popup" -> PopupManagerView(
+                        popup = localConfig.popupNotification,
+                        onUpdate = { pop ->
+                            localConfig = localConfig.copy(popupNotification = pop, lastUpdated = System.currentTimeMillis())
+                            hasUnsavedChanges = true
+                            onConfigChange(localConfig)
+                        }
+                    )
+                }
+            }
+        }
+
+        // 3. Bottom Status & Publish Bar
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Target: ${selectedPlatform.uppercase()} • Status: ${if (hasUnsavedChanges) "Unsaved Draft" else "Live"}", 
+                        fontSize = 11.sp, 
+                        color = if (hasUnsavedChanges) Color(0xFFD97706) else Color(0xFF059669),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text("Last: $lastUpdatedStr", fontSize = 10.sp, color = Color.Gray)
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = {
+                            onConfigChange(localConfig.copy(lastUpdated = System.currentTimeMillis()))
+                            hasUnsavedChanges = false
+                            Toast.makeText(context, "Draft saved locally!", Toast.LENGTH_SHORT).show()
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, FStorePurple),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text("Save", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = FStorePurple)
                     }
 
-                    HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray.copy(0.3f))
-
-                    config.homeSectionOrder.forEachIndexed { index, section ->
-                        val parts = section.split("|")
-                        val sectionType = parts[0]
-                        val sectionId = if (parts.size > 1) parts[1] else ""
-                        
-                        val isSpecial = sectionType == "BANNER_AD" || sectionType == "VIDEO_AD" || sectionType == "PRODUCT_AD" || sectionType == "Banners" || sectionType.startsWith("FLASH_D_PASS") || sectionType.startsWith("FRYUMM_PASS")
-                        val displayName = when {
-                            sectionType == "BANNER_AD" -> "Mini Banner (Inline Ad)"
-                            sectionType == "VIDEO_AD" -> "Video Advertisement"
-                            sectionType == "PRODUCT_AD" -> "Product Promotion"
-                            sectionType == "FLASH_D_PASS_99" || sectionType == "FRYUMM_PASS_99" -> "Flash-O Pass 99"
-                            sectionType == "FLASH_D_PASS_199" || sectionType == "FRYUMM_PASS_199" -> "Flash-O Premium 199"
-                            sectionType == "FLASH_D_PASS" || sectionType == "FRYUMM_PASS" -> "Flash-O Pass (Subscription)"
-                            else -> sectionType
-                        }
-                        
-                        SectionOrderItem(
-                            name = displayName,
-                            index = index + 1,
-                            isSpecial = isSpecial,
-                            url = sectionId.takeIf { isSpecial && sectionType != "Banners" && !sectionType.startsWith("FLASH_D_PASS") && !sectionType.startsWith("FRYUMM_PASS") },
-                            isProductAd = sectionType == "PRODUCT_AD",
-                            onUrlChange = { newUrl ->
-                                val newList = config.homeSectionOrder.toMutableList()
-                                newList[index] = "$sectionType|$newUrl"
-                                onConfigChange(config.copy(homeSectionOrder = newList))
-                            },
-                            onPreviewVideo = if (sectionType == "VIDEO_AD") { { videoPreviewUrl = sectionId } } else null,
-                            onDelete = if(isSpecial && sectionType != "Banners") { {
-                                val newList = config.homeSectionOrder.toMutableList()
-                                newList.removeAt(index)
-                                onConfigChange(config.copy(homeSectionOrder = newList))
-                            } } else null,
-                            onReorder = { newSerial ->
-                                val targetIndex = (newSerial - 1).coerceIn(0, config.homeSectionOrder.size - 1)
-                                val newList = config.homeSectionOrder.toMutableList()
-                                val item = newList.removeAt(index)
-                                newList.add(targetIndex, item)
-                                onConfigChange(config.copy(homeSectionOrder = newList))
-                            }
-                        )
+                    Button(
+                        onClick = {
+                            publishTarget = selectedPlatform
+                            showPublishDialog = true
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = FStorePurple),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text("Publish", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
-                    Text("Use Checkbox in 'Product Catalog' to add categories here.", fontSize = 11.sp, color = Color.Gray)
                 }
             }
         }
     }
 
-    if (showAddSectionDialog != null) {
-        AddSectionDialog(
-            type = showAddSectionDialog!!,
-            sectionUrlToAdd = sectionUrlToAdd,
-            onUrlChange = { sectionUrlToAdd = it },
-            onDismiss = { showAddSectionDialog = null },
-            onConfirm = { type, finalUrl ->
-                val current = config.homeSectionOrder.toMutableList()
-                val entry = if (finalUrl.isEmpty()) type else "$type|$finalUrl"
-                current.add(entry)
-
-                val newBanners = config.bannerAds.toMutableList()
-                val newVideos = config.videoAds.toMutableList()
-                val newPromos = config.productAds.toMutableList()
-
-                val timestampId = System.currentTimeMillis().toString()
-                when (type) {
-                    "BANNER_AD" -> newBanners.add(BannerAd(id = "b_$timestampId", imageUrl = finalUrl, title = "New Banner"))
-                    "VIDEO_AD" -> newVideos.add(VideoAd(id = "v_$timestampId", videoUrl = finalUrl, title = "New Video"))
-                    "PRODUCT_AD" -> newPromos.add(ProductAd(id = "p_$timestampId", label = finalUrl))
+    // Add Banner Dialog
+    if (showBannerDialog) {
+        AlertDialog(
+            onDismissRequest = { showBannerDialog = false },
+            title = { Text("Add Promotional Banner") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = bannerTitle, onValueChange = { bannerTitle = it }, label = { Text("Banner Title") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = bannerImageUrl, onValueChange = { bannerImageUrl = it }, label = { Text("Image URL (Unsplash / Storage)") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = bannerActionUrl, onValueChange = { bannerActionUrl = it }, label = { Text("Action URL / Target (e.g. flash_sale)") }, modifier = Modifier.fillMaxWidth())
                 }
-
-                onConfigChange(config.copy(
-                    homeSectionOrder = current.distinct(),
-                    bannerAds = newBanners,
-                    videoAds = newVideos,
-                    productAds = newPromos
-                ))
-                showAddSectionDialog = null
-            }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (bannerTitle.isNotBlank() && bannerImageUrl.isNotBlank()) {
+                        val newBanner = BannerAd(
+                            id = "banner_" + System.currentTimeMillis(),
+                            title = bannerTitle,
+                            imageUrl = bannerImageUrl,
+                            actionUrl = bannerActionUrl,
+                            isActive = true
+                        )
+                        localConfig = localConfig.copy(bannerAds = localConfig.bannerAds + newBanner, lastUpdated = System.currentTimeMillis())
+                        hasUnsavedChanges = true
+                        onConfigChange(localConfig)
+                        bannerTitle = ""
+                        bannerImageUrl = ""
+                        bannerActionUrl = ""
+                        showBannerDialog = false
+                        Toast.makeText(context, "Banner added to draft", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("ADD BANNER") }
+            },
+            dismissButton = { TextButton(onClick = { showBannerDialog = false }) { Text("CANCEL") } }
         )
     }
 
-    if (videoPreviewUrl != null) {
-        VideoPreviewDialog(
-            videoUrl = videoPreviewUrl!!,
-            onDismiss = { videoPreviewUrl = null }
+    // Add Section Dialog
+    if (showSectionDialog) {
+        AlertDialog(
+            onDismissRequest = { showSectionDialog = false },
+            title = { Text("Add Home Section") },
+            text = {
+                OutlinedTextField(
+                    value = newSectionName,
+                    onValueChange = { newSectionName = it },
+                    label = { Text("Section Name (e.g. BestSellers, CuratedDeals)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newSectionName.isNotBlank()) {
+                        val currentList = localConfig.homeSectionOrder.ifEmpty {
+                            listOf("hero_banners", "shop_by_category", "flash_sale", "best_sellers", "curated_collections", "flash_o_pass")
+                        }
+                        val updated = currentList + newSectionName.trim().lowercase().replace(" ", "_")
+                        localConfig = localConfig.copy(homeSectionOrder = updated, lastUpdated = System.currentTimeMillis())
+                        hasUnsavedChanges = true
+                        onConfigChange(localConfig)
+                        newSectionName = ""
+                        showSectionDialog = false
+                        Toast.makeText(context, "Section added to layout", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("ADD") }
+            },
+            dismissButton = { TextButton(onClick = { showSectionDialog = false }) { Text("CANCEL") } }
+        )
+    }
+
+    // Publish Confirmation Dialog
+    if (showPublishDialog) {
+        AlertDialog(
+            onDismissRequest = { showPublishDialog = false },
+            title = { Text("Publish to ${publishTarget.uppercase()} Live") },
+            text = { Text("Are you sure you want to publish this Home Screen configuration live? Changes will reflect immediately on client apps and websites.") },
+            confirmButton = {
+                Button(onClick = {
+                    showPublishDialog = false
+                    // Trigger final config save & publish
+                    onConfigChange(localConfig.copy(lastUpdated = System.currentTimeMillis()))
+                    hasUnsavedChanges = false
+                    Toast.makeText(context, "Successfully published live to ${publishTarget.uppercase()}!", Toast.LENGTH_LONG).show()
+                }) { Text("CONFIRM & PUBLISH") }
+            },
+            dismissButton = { TextButton(onClick = { showPublishDialog = false }) { Text("CANCEL") } }
         )
     }
 }
 
 @Composable
-fun AddSectionDialog(
-    type: String,
-    sectionUrlToAdd: String,
-    onUrlChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
+fun SectionsBuilderView(
+    config: DynamicAppConfig,
+    onAddSection: () -> Unit,
+    onReorder: (List<String>) -> Unit,
+    onDeleteSection: (String) -> Unit
 ) {
-    val isProduct = type == "PRODUCT_AD"
-    val isVideo = type == "VIDEO_AD"
-    val isBanner = type == "BANNER_AD"
+    val sections = config.homeSectionOrder.ifEmpty {
+        listOf("hero_banners", "shop_by_category", "flash_sale", "best_sellers", "curated_collections", "flash_o_pass")
+    }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add ${if(isVideo) "Video Ad" else if(isBanner) "Banner" else "Promotion"}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val helpText = when {
-                    isProduct -> "Enter the badge label (e.g. Featured, Sponsored) to group products."
-                    isVideo -> "Enter a direct MP4 URL or YouTube link. YouTube will use a player."
-                    else -> "Enter the direct image URL for this banner."
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Configured Section Sequence", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Button(onClick = onAddSection, colors = ButtonDefaults.buttonColors(containerColor = FStorePurple)) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Add Section", fontSize = 12.sp)
+            }
+        }
+
+        if (sections.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No sections configured. Click 'Add Section' to build layout.", color = Color.Gray, fontSize = 13.sp)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                itemsIndexed(sections) { index, section ->
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = FStorePurple.copy(alpha = 0.1f)
+                                ) {
+                                    Text("#${index + 1}", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = FStorePurple, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                                Column {
+                                    Text(section.replace("_", " ").replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text("Active Section Component", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                IconButton(onClick = {
+                                    if (index > 0) {
+                                        val mutable = sections.toMutableList()
+                                        val item = mutable.removeAt(index)
+                                        mutable.add(index - 1, item)
+                                        onReorder(mutable)
+                                    }
+                                }) {
+                                    Icon(Icons.Default.ArrowUpward, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                                }
+                                IconButton(onClick = {
+                                    if (index < sections.size - 1) {
+                                        val mutable = sections.toMutableList()
+                                        val item = mutable.removeAt(index)
+                                        mutable.add(index + 1, item)
+                                        onReorder(mutable)
+                                    }
+                                }) {
+                                    Icon(Icons.Default.ArrowDownward, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                                }
+                                IconButton(onClick = { onDeleteSection(section) }) {
+                                    Icon(Icons.Default.Delete, null, tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
                 }
-                Text(text = helpText, fontSize = 12.sp, color = Color.Gray)
+            }
+        }
+    }
+}
+
+@Composable
+fun BannersManagerView(
+    banners: List<BannerAd>,
+    onAddClick: () -> Unit,
+    onToggle: (String) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Promotional Banners (${banners.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Button(onClick = onAddClick, colors = ButtonDefaults.buttonColors(containerColor = FStorePurple)) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Add Banner", fontSize = 12.sp)
+            }
+        }
+
+        if (banners.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No banners configured. Click 'Add Banner' to create one.", color = Color.Gray, fontSize = 13.sp)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                itemsIndexed(banners) { _, banner ->
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(banner.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Switch(
+                                    checked = banner.isActive,
+                                    onCheckedChange = { onToggle(banner.id) }
+                                )
+                            }
+                            Text("Action: ${banner.actionUrl.ifEmpty { "None" }}", fontSize = 11.sp, color = Color.Gray)
+                            Spacer(Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { onDelete(banner.id) }) {
+                                    Icon(Icons.Default.Delete, null, tint = Color.Red, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Delete", color = Color.Red, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FlashSaleManagerView(
+    flashSale: FlashSale?,
+    onUpdate: (FlashSale) -> Unit
+) {
+    var title by remember(flashSale) { mutableStateOf(flashSale?.title ?: "Flash Sale 50% Off") }
+    var discount by remember(flashSale) { mutableStateOf((flashSale?.discountPercentage ?: 50).toString()) }
+    var isActive by remember(flashSale) { mutableStateOf(flashSale?.isActive ?: true) }
+
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Flash Sale Configuration", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        
+        Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Enable Flash Sale Engine", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Switch(checked = isActive, onCheckedChange = { 
+                        isActive = it
+                        onUpdate(FlashSale(title = title, discountPercentage = discount.toIntOrNull() ?: 50, isActive = isActive, startTime = System.currentTimeMillis(), endTime = System.currentTimeMillis() + 86400000))
+                    })
+                }
                 OutlinedTextField(
-                    value = sectionUrlToAdd,
-                    onValueChange = onUrlChange,
-                    label = { Text(if(isProduct) "Section Label" else "Media URL") },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(if(isProduct) "Featured" else "https://...") }
+                    value = title,
+                    onValueChange = { 
+                        title = it
+                        onUpdate(FlashSale(title = title, discountPercentage = discount.toIntOrNull() ?: 50, isActive = isActive, startTime = System.currentTimeMillis(), endTime = System.currentTimeMillis() + 86400000))
+                    },
+                    label = { Text("Flash Sale Title") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = discount,
+                    onValueChange = { 
+                        discount = it
+                        onUpdate(FlashSale(title = title, discountPercentage = discount.toIntOrNull() ?: 50, isActive = isActive, startTime = System.currentTimeMillis(), endTime = System.currentTimeMillis() + 86400000))
+                    },
+                    label = { Text("Discount Percentage (%)") },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val finalUrl = if (sectionUrlToAdd.contains("drive.google.com")) {
-                    sectionUrlToAdd.replace("/file/d/", "/uc?export=view&id=").replace("/view?usp=sharing", "")
-                } else sectionUrlToAdd
-                onConfirm(type, finalUrl)
-            }) { Text("ADD SECTION") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCEL") } }
-    )
+        }
+    }
 }
 
 @Composable
-fun VideoPreviewDialog(
-    videoUrl: String,
-    onDismiss: () -> Unit
+fun FlashOPassManagerView(
+    passConfig: FlashOPassConfig?,
+    onUpdate: (FlashOPassConfig) -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Video/GIF Preview") },
-        text = {
-            val isYouTube = videoUrl.contains("youtube.com") || videoUrl.contains("youtu.be")
-            val isGif = videoUrl.lowercase().endsWith(".gif") || videoUrl.contains("giphy.com")
+    var title by remember(passConfig) { mutableStateOf(passConfig?.title ?: "Flash-O Pass") }
+    var isActive by remember(passConfig) { mutableStateOf(passConfig?.isActive ?: true) }
 
-            Box(modifier = Modifier.fillMaxWidth().height(250.dp).background(Color.Black), contentAlignment = Alignment.Center) {
-                if (isYouTube) {
-                    val videoId = when {
-                        videoUrl.contains("v=") -> videoUrl.substringAfter("v=").substringBefore("&")
-                        videoUrl.contains("youtu.be/") -> videoUrl.substringAfter("youtu.be/").substringBefore("?").substringBefore("/")
-                        videoUrl.contains("/shorts/") -> videoUrl.substringAfter("/shorts/").substringBefore("?").substringBefore("/")
-                        videoUrl.contains("embed/") -> videoUrl.substringAfter("embed/").substringBefore("?").substringBefore("/")
-                        else -> videoUrl.substringAfterLast("/")
-                    }
-                    val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&origin=https://www.youtube.com"
-                    AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                settings.apply {
-                                    javaScriptEnabled = true
-                                    domStorageEnabled = true
-                                    mediaPlaybackRequiresUserGesture = false
-                                    userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
-                                }
-                                webViewClient = WebViewClient()
-                                loadUrl(embedUrl)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else if (isGif) {
-                    AsyncImage(
-                        model = videoUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    AndroidView(
-                        factory = { ctx ->
-                            VideoView(ctx).apply {
-                                setVideoURI(Uri.parse(videoUrl))
-                                val controller = MediaController(ctx)
-                                controller.setAnchorView(this)
-                                setMediaController(controller)
-                                setOnPreparedListener { 
-                                    it.isLooping = true
-                                    it.setVolume(0f, 0f)
-                                    it.start() 
-                                }
-                                setOnErrorListener { _, _, _ -> false }
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Flash-O Pass Membership Tiers", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        
+        Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Enable Flash-O Pass", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Switch(checked = isActive, onCheckedChange = { 
+                        isActive = it
+                        onUpdate(FlashOPassConfig(title = title, isActive = isActive, tiers = passConfig?.tiers ?: emptyList()))
+                    })
                 }
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { 
+                        title = it
+                        onUpdate(FlashOPassConfig(title = title, isActive = isActive, tiers = passConfig?.tiers ?: emptyList()))
+                    },
+                    label = { Text("Pass Program Title") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Configured Tiers: ${(passConfig?.tiers ?: emptyList()).size} Active Tiers", fontSize = 12.sp, color = Color.Gray)
             }
-        },
-        confirmButton = {
-            Button(onClick = onDismiss) { Text("CLOSE") }
         }
-    )
+    }
+}
+
+@Composable
+fun PopupManagerView(
+    popup: PopupNotification?,
+    onUpdate: (PopupNotification) -> Unit
+) {
+    var title by remember(popup) { mutableStateOf(popup?.title ?: "") }
+    var message by remember(popup) { mutableStateOf(popup?.message ?: "") }
+    var imageUrl by remember(popup) { mutableStateOf(popup?.imageUrl ?: "") }
+    var isActive by remember(popup) { mutableStateOf(popup?.isActive ?: false) }
+
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Customer App Popup Alert", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        
+        Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Broadcast Popup to App", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Switch(checked = isActive, onCheckedChange = { 
+                        isActive = it
+                        onUpdate(PopupNotification(title = title, message = message, imageUrl = imageUrl, isActive = isActive))
+                    })
+                }
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { 
+                        title = it
+                        onUpdate(PopupNotification(title = title, message = message, imageUrl = imageUrl, isActive = isActive))
+                    },
+                    label = { Text("Popup Title") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { 
+                        message = it
+                        onUpdate(PopupNotification(title = title, message = message, imageUrl = imageUrl, isActive = isActive))
+                    },
+                    label = { Text("Popup Message") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = imageUrl,
+                    onValueChange = { 
+                        imageUrl = it
+                        onUpdate(PopupNotification(title = title, message = message, imageUrl = imageUrl, isActive = isActive))
+                    },
+                    label = { Text("Image URL (Optional)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
 }

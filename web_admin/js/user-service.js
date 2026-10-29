@@ -16,7 +16,7 @@ import {
     signOut
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-const COLLECTIONS = ["users", "admins", "customers", "sellers", "riders", "staff", "customer_leads", "profiles", "accounts"];
+const COLLECTIONS = ["users", "admins", "customers", "merchants", "riders", "staff", "customer_leads", "profiles", "accounts"];
 
 const MASTER_ADMIN_EMAILS = [
     "ranjanamishra1117@gmail.com",
@@ -153,7 +153,7 @@ function parseCollectionDocs(colName, docs) {
         } else if (rawRole.includes("CUSTOMER") || rawRole.includes("USER")) {
             role = "CUSTOMER";
         } else {
-            role = (colName === "sellers") ? "MERCHANT" : (colName === "riders" ? "RIDER" : (colName === "staff" ? "OTHER" : "CUSTOMER"));
+            role = (colName === "merchants") ? "MERCHANT" : (colName === "riders" ? "RIDER" : (colName === "staff" ? "OTHER" : "CUSTOMER"));
         }
 
         const uid = String(docSnap.id || data.uid || data.userId || data.id || `user_${Date.now()}`);
@@ -346,7 +346,7 @@ function mergeAndDeduplicateUsers() {
         resultList = [
             { uid: "usr_cust_1", name: "Rahul Sharma", email: "rahul.sharma@gmail.com", phone: "+91 9812345678", role: "CUSTOMER", dept: "", isActive: true, collectionName: "customers" },
             { uid: "usr_cust_2", name: "Pooja Verma", email: "pooja.v@gmail.com", phone: "+91 9898765432", role: "CUSTOMER", dept: "", isActive: true, collectionName: "customers" },
-            { uid: "usr_merch_1", name: "Fresh Mart Dark Store", email: "store1@flash-o.com", phone: "+91 9823456789", role: "MERCHANT", dept: "", isActive: true, collectionName: "sellers" },
+            { uid: "usr_merch_1", name: "Fresh Mart Dark Store", email: "store1@flash-o.com", phone: "+91 9823456789", role: "MERCHANT", dept: "", isActive: true, collectionName: "merchants" },
             { uid: "usr_rider_1", name: "Amit Kumar (Express Rider)", email: "amit.rider@flash-o.com", phone: "+91 9834567890", role: "RIDER", dept: "", isActive: true, collectionName: "riders" },
             { uid: "usr_staff_1", name: "Neha Singh (Operations)", email: "neha.s@flash-o.com", phone: "+91 9845678901", role: "OTHER", dept: "Operations & Support", isActive: true, collectionName: "staff" }
         ];
@@ -403,7 +403,7 @@ export async function updateUserAccountInDb({ uid, colName, name, phone, email, 
     }
 
     // Always map the target collection strictly based on the assigned role
-    const newTargetCollection = role === "ADMIN" ? "users" : (role === "RIDER" ? "riders" : (role === "OTHER" ? "staff" : (role === "CUSTOMER" ? "customers" : "sellers")));
+    const newTargetCollection = role === "ADMIN" ? "users" : (role === "RIDER" ? "riders" : (role === "OTHER" ? "staff" : (role === "CUSTOMER" ? "customers" : "merchants")));
 
     const userDocRef = doc(db, newTargetCollection, uid);
     const updateData = {
@@ -454,7 +454,7 @@ export async function createNewUserAccountInDb({ name, phone, email, pass, role,
     if (role === "ADMIN" && !isMasterAdminEmail(email)) {
         throw new Error("Security Violation: Cannot assign Admin role to non-whitelisted email.");
     }
-    const targetCollection = role === "ADMIN" ? "users" : (role === "RIDER" ? "riders" : (role === "OTHER" ? "staff" : (role === "CUSTOMER" ? "customers" : "sellers")));
+    const targetCollection = role === "ADMIN" ? "users" : (role === "RIDER" ? "riders" : (role === "OTHER" ? "staff" : (role === "CUSTOMER" ? "customers" : "merchants")));
 
     let secondaryApp = null;
     try {

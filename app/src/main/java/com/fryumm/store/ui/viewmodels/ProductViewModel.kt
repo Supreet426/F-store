@@ -152,7 +152,8 @@ class ProductViewModel @Inject constructor(
                     "isPreorderEnabled" to product.isPreorderEnabled,
                     "maxPreorderCapacity" to product.maxPreorderCapacity,
                     "preorderStart" to product.preorderStart,
-                    "preorderEnd" to product.preorderEnd
+                    "preorderEnd" to product.preorderEnd,
+                    "sequenceNumber" to product.sequenceNumber
                 )
 
                 val result = productRepository.updateProduct(product.id, updateData)

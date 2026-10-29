@@ -303,11 +303,12 @@ fun MainScreen(
 
     val currentTitle = when {
         currentRoute == "orders" -> "Live Orders Board"
-        currentRoute == "stores" -> "Product Catalog"
+        currentRoute == "stores" -> "Products"
         currentRoute == "users" -> if (dynamicTitle.isNotEmpty()) dynamicTitle else "User Management Portal"
         currentRoute == "promotion" -> "Coupons & Promo Offers"
         currentRoute == "insights" -> "Overview"
-        currentRoute == "app_management" -> "Ecosystem Controls"
+        currentRoute == "app_management" -> "Home Screen Studio"
+        currentRoute == "app_update" -> "Update Applications"
         currentRoute == "inventory" -> "Stock Inventory"
         currentRoute == "dispatch" -> "Realtime Operations Live Map"
         currentRoute == "dark_stores" -> "Dark Store Fulfillment Hubs"
@@ -451,28 +452,6 @@ fun MainScreen(
                     )
 
                     NavigationDrawerItem(
-                        label = { Text("Products & Catalog", fontWeight = FontWeight.Bold) },
-                        selected = currentRoute == "stores",
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            navController.navigate("stores") { launchSingleTop = true }
-                        },
-                        icon = { Icon(Icons.Default.Store, null) },
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                    )
-
-                    NavigationDrawerItem(
-                        label = { Text("Stock & Inventory", fontWeight = FontWeight.Bold) },
-                        selected = currentRoute == "inventory",
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            navController.navigate("inventory") { launchSingleTop = true }
-                        },
-                        icon = { Icon(Icons.Default.Inventory2, null) },
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                    )
-
-                    NavigationDrawerItem(
                         label = { Text("Low Stock Alerts", fontWeight = FontWeight.Bold) },
                         selected = currentRoute == "inventory_alerts",
                         onClick = {
@@ -539,7 +518,7 @@ fun MainScreen(
                     )
 
                     NavigationDrawerItem(
-                        label = { Text("App Control Center", fontWeight = FontWeight.Bold) },
+                        label = { Text("Home Screen Studio", fontWeight = FontWeight.Bold) },
                         selected = currentRoute == "app_management",
                         onClick = {
                             scope.launch { drawerState.close() }
@@ -639,11 +618,11 @@ fun MainScreen(
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
 
-                    if (isAdmin) {
+                    if (isAdmin || userProfile.userRole == UserRole.OTHER || userProfile.staffDepartment.isNotBlank()) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp), color = Color.LightGray.copy(alpha = 0.3f))
 
                         Text(
-                            "ADMINISTRATIVE CONTROL",
+                            "ADMINISTRATIVE & STAFF CONTROL",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF1A237E),
                             fontWeight = FontWeight.Bold,
@@ -673,7 +652,7 @@ fun MainScreen(
                         )
 
                         NavigationDrawerItem(
-                            label = { Text("Ecosystem Update", fontWeight = FontWeight.Bold) },
+                            label = { Text("Update Applications", fontWeight = FontWeight.Bold) },
                             selected = currentRoute == "app_update",
                             onClick = {
                                 scope.launch { drawerState.close() }
@@ -786,9 +765,7 @@ fun MainScreen(
                                         Icon(Icons.Default.Close, contentDescription = "Clear Search", tint = Color.White)
                                     }
                                 }
-                                IconButton(onClick = { navController.navigate("add_product") }) {
-                                    Icon(Icons.Default.Add, contentDescription = "Add Product", tint = Color.White)
-                                }
+                                // Removed Add Product icon from header as it's not the purpose of the Products page anymore
                             }
                             if (currentRoute == "orders") {
                                 IconButton(onClick = { navController.navigate("batch_picking") }) {
@@ -818,11 +795,6 @@ fun MainScreen(
                                     IconButton(onClick = { showClearConfirm = true }) {
                                         Icon(Icons.Default.DeleteSweep, contentDescription = "Clear All Orders", tint = Color.White)
                                     }
-                                }
-                            }
-                            if (currentRoute == "users") {
-                                IconButton(onClick = { navController.navigate("pending_approvals") }) {
-                                    Icon(Icons.Default.HourglassTop, contentDescription = "Pending Approvals", tint = Color.White)
                                 }
                             }
                             if (currentRoute == "dispatch") {
@@ -860,11 +832,11 @@ fun MainScreen(
                             val itemModifier = if (isAdmin) Modifier.padding(horizontal = 12.dp) else Modifier.weight(1f)
                             if (isAdmin) {
                                 NavTabItem(selected = currentRoute == "orders", onClick = { navController.navigate("orders") }, icon = Icons.Default.ListAlt, label = "Orders", isAdmin = true, modifier = itemModifier)
-                                NavTabItem(selected = currentRoute == "stores", onClick = { navController.navigate("stores") }, icon = Icons.Default.Store, label = "Stores", isAdmin = true, modifier = itemModifier)
+                                NavTabItem(selected = currentRoute == "stores", onClick = { navController.navigate("stores") }, icon = Icons.Default.Store, label = "Products", isAdmin = true, modifier = itemModifier)
                                 NavTabItem(selected = currentRoute == "users", onClick = { navController.navigate("users") }, icon = Icons.Default.People, label = "Users", isAdmin = true, modifier = itemModifier)
                                 NavTabItem(selected = currentRoute == "promotion", onClick = { navController.navigate("promotion") }, icon = Icons.Default.AdsClick, label = "Promotion", isAdmin = true, modifier = itemModifier)
                                 NavTabItem(selected = currentRoute == "insights", onClick = { navController.navigate("insights") }, icon = Icons.Default.Insights, label = "Insights", isAdmin = true, modifier = itemModifier)
-                                NavTabItem(selected = currentRoute == "app_management", onClick = { navController.navigate("app_management") }, icon = Icons.Default.Settings, label = "Control", isAdmin = true, modifier = itemModifier)
+                                NavTabItem(selected = currentRoute == "app_management", onClick = { navController.navigate("app_management") }, icon = Icons.Default.Settings, label = "Studio", isAdmin = true, modifier = itemModifier)
                             } else {
                                 NavTabItem(selected = currentRoute == "orders", onClick = { navController.navigate("orders") }, icon = Icons.Default.ListAlt, label = "Orders", isAdmin = false, modifier = itemModifier)
                                 NavTabItem(selected = currentRoute == "inventory", onClick = { navController.navigate("inventory") }, icon = Icons.Default.Inventory2, label = "Stock", isAdmin = false, modifier = itemModifier)

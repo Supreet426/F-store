@@ -64,7 +64,7 @@ class AuthViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val collections = listOf("users", "sellers", "riders", "staff", "customers")
+                val collections = listOf("users", "merchants", "riders", "staff", "customers")
                 var doc: com.google.firebase.firestore.DocumentSnapshot? = null
                 for (coll in collections) {
                     try {
@@ -106,7 +106,7 @@ class AuthViewModel @Inject constructor(
                     )
                     pendingBusinessType = ""
                     try {
-                        val targetCollection = if (newProfile.role == "ADMIN") "users" else "sellers"
+                        val targetCollection = if (newProfile.role == "ADMIN") "users" else "merchants"
                         firestore.collection(targetCollection).document(currentUser.uid).set(newProfile).await()
                     } catch (e: Exception) {
                         Log.e("AuthViewModel", "Error saving new profile to Firestore", e)
@@ -178,7 +178,7 @@ class AuthViewModel @Inject constructor(
                 var targetEmail = cleanInput
                 
                 if (!cleanInput.contains("@")) {
-                    val collections = listOf("users", "sellers", "riders", "staff", "customers")
+                    val collections = listOf("users", "merchants", "riders", "staff", "customers")
                     var resolvedEmail: String? = null
                     for (coll in collections) {
                         try {
@@ -339,7 +339,7 @@ class AuthViewModel @Inject constructor(
                     val targetCollection = when (roleStr) {
                         "RIDER" -> "riders"
                         "OTHER" -> "staff"
-                        else -> "sellers"
+                        else -> "merchants"
                     }
                     val existing1 = firestore.collection(targetCollection).whereEqualTo("phoneNumber", cleanPhone).get().await()
                     val existing2 = firestore.collection(targetCollection).whereEqualTo("mobile", cleanPhone).get().await()
@@ -357,7 +357,7 @@ class AuthViewModel @Inject constructor(
                         "RIDER" -> "riders"
                         "OTHER" -> "staff"
                         "CUSTOMER" -> "customers"
-                        else -> "sellers"
+                        else -> "merchants"
                     }
                     val newProfile = UserProfile(
                         uid = user.uid, 

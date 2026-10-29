@@ -48,7 +48,8 @@ data class AppUpdateInfo(
     val appName: String = "",
     val appDescription: String = "",
     val iconUrl: String = "",
-    val category: String = "Ecosystem App",
+    val category: String = "Application",
+    val isWebApp: Boolean = false, // True for Web Portals / Websites
     val versionCode: Int = 1,
     val versionName: String = "1.0.0",
     val downloadUrl: String = "",
@@ -60,8 +61,16 @@ data class AppUpdateInfo(
     val isMandatory: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
 ) {
+    fun isWebPortal(): Boolean {
+        return isWebApp || category.contains("Web", ignoreCase = true) || appId == "web" || appId.contains("web", ignoreCase = true)
+    }
+
     fun getEffectiveDownloadUrl(): String {
-        return directApkUrl.ifEmpty { downloadUrl.ifEmpty { playStoreUrl.ifEmpty { websiteUrl } } }
+        return if (isWebPortal()) {
+            websiteUrl
+        } else {
+            directApkUrl.ifEmpty { downloadUrl.ifEmpty { playStoreUrl.ifEmpty { websiteUrl } } }
+        }
     }
 }
 

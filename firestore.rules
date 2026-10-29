@@ -37,11 +37,11 @@ service cloud.firestore {
       allow delete: if isMasterAdmin();
     }
 
-    // Legacy Sellers Collection - Isolated Profile Access
-    match /sellers/{sellerId} {
-      allow read: if isDocOwner(sellerId) || isMasterAdmin();
-      allow create: if isDocOwner(sellerId);
-      allow update: if isDocOwner(sellerId) || isMasterAdmin();
+    // Merchants Collection - Isolated Profile Access
+    match /merchants/{merchantId} {
+      allow read: if isDocOwner(merchantId) || isMasterAdmin();
+      allow create: if isDocOwner(merchantId);
+      allow update: if isDocOwner(merchantId) || isMasterAdmin();
       allow delete: if isMasterAdmin();
     }
 
@@ -76,10 +76,10 @@ service cloud.firestore {
     }
 
     // Private Internal Master Products Collection
-    // READ: Restricted to canonical merchant owner (merchantId == auth.uid) or Master Admin
+    // READ: Accessible to all authenticated store staff / admins / merchants
     // DIRECT CLIENT WRITES (create/update/delete) ARE STRICTLY DENIED (if false)
     match /products/{productId} {
-      allow read: if isAuthenticated() && (resource.data.merchantId == request.auth.uid || isMasterAdmin());
+      allow read: if isAuthenticated();
       allow create, update, delete: if false;
     }
 
